@@ -716,6 +716,15 @@ int camcontrol::apply_essential_param_param(int camnum)
 		return ret;
 	}
 
+	Logger::log(camnum, "apply imageformat : %s", captureformat.c_str());
+	ret = set_settings_value("imageformat", captureformat.c_str());		// "RAW"
+	if (ret < GP_OK)
+	{
+		Logger::log(camnum, "Error set_settings_value imageformat : %s : %d : %d", captureformat.c_str(), camnum, ret);
+		return ret;
+	}
+
+
 	return ret;
 }
 
@@ -725,15 +734,24 @@ void camcontrol::set_essential_param(CAMERA_PARAM param, string value)
 	{
 	case ISO:
 		iso = value;
-		//Logger::log(0, "recv setting iso  %s", iso.c_str());
+		Logger::log("recv setting iso  %s", iso.c_str());
 		break;
 	case SHUTTERSPEED:
 		shutterspeed = value;
-		//Logger::log(0, "recv setting shutterspeed  %s", shutterspeed.c_str());
+		Logger::log("recv setting shutterspeed  %s", shutterspeed.c_str());
 		break;
 	case APERTURE:
 		aperture = value;
-		//Logger::log(0, "recv setting aperture  %s", aperture.c_str());
+		Logger::log("recv setting aperture  %s", aperture.c_str());
+		break;
+
+	case CAPTURE_FORMAT:
+		captureformat = value;
+		if (captureformat == "RAW + Large Fine JPEG" || captureformat == "RAW")
+			capturefile_ext = "raw";
+		else
+			capturefile_ext = "jpg";
+		Logger::log("recv setting captureformat  %s", captureformat.c_str());
 		break;
 	}
 }

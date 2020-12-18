@@ -28,29 +28,17 @@ Choice: 11 Release 3
 #include <stdlib.h>
 
 #include "camera_thread.h"
-//#include "network.h"
+#include "camera_manager.h"
+#include "camcontrol.h"
 #include "utils.h"
-//#include "commander.h"
-//#include "udpsocket.h"
-//#include "tcpsocket.h"
 
-//#include "CameraController.h"
-//#include "CameraManager.h"
-
-//Command CameraThread::command[MAX_CAMERA];
-//Network CameraThread::network[MAX_CAMERA];
-
-//TCP_Socket CameraThread::tcpsocket[MAX_CAMERA];
-//UDP_Socket CameraThread::udpsocket[MAX_CAMERA];
-
-CameraController* camerathread::cameras[MAX_CAMERA];
+camcontrol* camerathread::cameras[MAX_CAMERA];
 CAMERA_STATE camerathread::camera_state[MAX_CAMERA];
 
 bool camerathread::exitthread[MAX_CAMERA];
 pthread_mutex_t camerathread::mutex_lock[MAX_CAMERA];
 pthread_mutex_t camerathread::exitmutex_lock[MAX_CAMERA];
 int camerathread::upload_progress[MAX_CAMERA];
-char camerathread::camera_serverid[MAX_CAMERA];
 
 camerathread::camerathread()
 {
@@ -74,22 +62,17 @@ void camerathread::init(int camnum)
 void* camerathread::thread_fn(void* arg)
 {
 	int camnum = (int)arg;
-// 	CameraController* camera = CameraMan::getInstance()->getCamera(camnum);
-// 	if (camera == NULL)
-// 	{
-// 		Logger::log(-1, "Thread : Camera Create fail");
-// 		return((void*)0);
-// 	}
-// 	else
-// 	{
-// 		Logger::log(-1, "Thread : Camera Create success %d", camnum);
-// 	}
-// 
-// 	cameras[camnum] = camera;
-
-//	network[camnum].init();
-//	tcpsocket[camnum].init();
-//	udpsocket[camnum].init(camnum);
+	camcontrol* camera = camera_manager::getInstance()->getCamera(camnum);
+	if (camera == NULL)
+	{
+		Logger::log(-1, "Thread : Camera Create fail");
+		return((void*)0);
+	}
+	else
+	{
+		Logger::log(-1, "Thread : Camera Create success %d", camnum);
+	}
+ 	cameras[camnum] = camera;
 
 	while (true)
 	{
@@ -113,7 +96,7 @@ void* camerathread::thread_fn(void* arg)
 			pthread_mutex_lock(&mutex_lock[camnum]);
 
 			// 네트웍 업데이트 / 명령어 처리
-			Update(camnum);
+			//Update(camnum);
 
 			pthread_mutex_unlock(&mutex_lock[camnum]);
 		}
@@ -280,7 +263,7 @@ int camerathread::parsePacket(int camnum, char* buf)
 	int ret = 0;
 	std::string  date = Utils::getCurrentDateTime();
 
-#if 0
+#if 1
 	switch (packet)
 	{
 		case PACKET_TRY_CONNECT:
@@ -307,24 +290,14 @@ int camerathread::parsePacket(int camnum, char* buf)
 			char i = buf[1];	// iso
 			char s = buf[2];	// shutterspeed
 			char a = buf[3];	// aperture
+			char f = buf[4];	// format
 
 			Logger::log(camnum, "PACKET_HALFPRESS %d : %d : %d\n", i,s,a);
 
 			cameras[camnum]->set_essential_param(CAMERA_PARAM::ISO, isoString[i]);
 			cameras[camnum]->set_essential_param(CAMERA_PARAM::SHUTTERSPEED, shutterspeedString[s]);
 			cameras[camnum]->set_essential_param(CAMERA_PARAM::APERTURE, apertureString[a]);
-
-			// false로 하면 auto focus 안먹음
-			ret = cameras[camnum]->apply_autofocus(camnum, true);
-			if (ret < GP_OK)
-			{
-				string errorstr = GetError(ret);
-				Logger::log(camnum,"ERR apply_autofocus (False) : %s(%d): %d\n", errorstr.c_str(), ret, camnum);
-
-				data[1] = RESPONSE_FAIL;
-				tcpsocket[camnum].send(data);
-				return ret;
-			}
+			cameras[camnum]->set_essential_param(CAMERA_PARAM::CAPTURE_FORMAT, captureformatString[f]);
 
 			ret = cameras[camnum]->apply_essential_param_param(camnum);
 			if (ret < GP_OK)
@@ -333,7 +306,19 @@ int camerathread::parsePacket(int camnum, char* buf)
 				Logger::log(camnum, "ERR apply_essential_param_param : %s(%d): %d\n", errorstr.c_str(), ret, camnum);
 
 				data[1] = RESPONSE_FAIL;
-				tcpsocket[camnum].send(data);
+				//tcpsocket[camnum].send(data);
+				return ret;
+			}
+
+			// false로 하면 auto focus 안먹음
+			ret = cameras[camnum]->apply_autofocus(camnum, true);
+			if (ret < GP_OK)
+			{
+				string errorstr = GetError(ret);
+				Logger::log(camnum, "ERR apply_autofocus (False) : %s(%d): %d\n", errorstr.c_str(), ret, camnum);
+
+				data[1] = RESPONSE_FAIL;
+				//tcpsocket[camnum].send(data);
 				return ret;
 			}
 
@@ -346,7 +331,7 @@ int camerathread::parsePacket(int camnum, char* buf)
 
 
 				data[1] = RESPONSE_FAIL;
-				tcpsocket[camnum].send(data);
+				//tcpsocket[camnum].send(data);
 				return ret;
 			}
 			else
@@ -359,9 +344,10 @@ int camerathread::parsePacket(int camnum, char* buf)
 				Logger::log(camnum, "ERR eosremoterelease Release Full : %s(%d): %d\n", errorstr.c_str(), ret, camnum);
 
 				data[1] = RESPONSE_FAIL;
-				tcpsocket[camnum].send(data);
+				//tcpsocket[camnum].send(data);
 				return ret;
 			}
+
 
 /*
 			ret = cameras[camnum]->apply_autofocus(camnum, false);
@@ -376,15 +362,20 @@ int camerathread::parsePacket(int camnum, char* buf)
 			}*/
 
 			data[1] = RESPONSE_OK;
-			tcpsocket[camnum].send(data);
+			//tcpsocket[camnum].send(data);
 		}
 		break;
 
 		case PACKET_SHOT:
 		{
 			Logger::log(camnum, "---> Shot : %s", date.c_str());
+
+			// ftp path 읽어야함
+			ftp_path = (char*)buf+1;
+
 			// 찍어
-			string name = Utils::format_string("name-%d.jpg", camera_serverid[camnum]);
+			string name = Utils::format_string("%s-%d.%s", machine_name.c_str(), camnum, capturefile_ext.c_str());
+			
 			int ret = cameras[camnum]->capture3(name.c_str());
 
 			if (ret < GP_OK)
@@ -402,6 +393,7 @@ int camerathread::parsePacket(int camnum, char* buf)
 		}
 		break;
 
+/*
 		case PACKET_ISO:
 		{
 			//int value = (int&)*(it->data);
@@ -429,6 +421,7 @@ int camerathread::parsePacket(int camnum, char* buf)
 			cameras[camnum]->set_essential_param(CAMERA_PARAM::SHUTTERSPEED, shutterspeed);
 		}
 		break;
+*/
 
 		case PACKET_FORCE_UPLOAD:
 			//camera_state[camnum] = CAMERA_STATE::STATE_UPLOAD;
@@ -439,136 +432,12 @@ int camerathread::parsePacket(int camnum, char* buf)
 }
 
 
-int	camerathread::UpdateCommand(int camnum)
+
+
+void camerathread::addTestPacket(char *packet, int camnum)
 {
-	int ret = 0;
-#if 0
-	Commander* commander = network[camnum].getcommander();
-	if (commander == NULL) return -1;
+	parsePacket(camnum, packet);
 
-	std::string  date = Utils::getCurrentDateTime();
-	std::vector<Command>::iterator it = commander->commandlist.begin();
-
-	for (; it != commander->commandlist.end(); it++)
-	{
-		switch (it->packet)
-		{
-		case PACKET_TRY_CONNECT:
-			camera_state[camnum] = CAMERA_STATE::STATE_CONNECTION;
-			break;
-
-		case PACKET_HALFPRESS:
-		{
-/*
-			if (cameras[camnum]->is_halfpressed())
-			{
-				ret = cameras[camnum]->set_settings_value("eosremoterelease", "Release Full");
-				if (ret < GP_OK)
-				{
-					printf("ERR eosremoterelease Release Full : %d : %d\n", ret, camnum);
-					return ret;
-				}
-				printf("End Release 1 : %d : %d\n", ret, camnum);
-			}
-*/
-
-			// 					int p = (int&)*(it->data);
-			// 					uint16_t param = p;
-			// 					ret = PartController::getInstance()->addsendqueuecommand(lwheelid, MOVE_SPEED, param);
-
-			ret = cameras[camnum]->apply_autofocus(camnum, true);
-			if (ret < GP_OK)
-			{
-				printf("ERR apply_autofocus (True) : %d : %d\n", ret, camnum);
-				return ret;
-			}
-
-			ret = cameras[camnum]->apply_essential_param_param(camnum);
-			if (ret < GP_OK)
-			{
-				printf("ERR apply_essential_param_param : %d : %d\n", ret, camnum);
-				return ret;
-			}
-
-			// 포커스 
-			ret = cameras[camnum]->set_settings_value("eosremoterelease", "Press Half");
-			if (ret < GP_OK)
-			{
-				printf("ERR eosremoterelease Press Half : %d : %d\n", ret, camnum);
-				return ret;
-			}
-			else
-				printf("Press Half : %d : %d\n", ret, camnum);
-
-			ret = cameras[camnum]->apply_autofocus(camnum, false);
-			if (ret < GP_OK)
-			{
-				printf("ERR apply_autofocus (False) : %d : %d\n", ret, camnum);
-				return ret;
-			}
-
-		}
-		break;
-
-		case PACKET_SHOT:
-		{
-			printf("---> Shot : %d %s \n", camnum, date.c_str());
-			// 찍어
-			string name = Utils::format_string("name-%d.jpg", camnum);
-			int ret = cameras[camnum]->capture3(name.c_str());
-
-			if (ret < GP_OK)
-			{
-				camera_state[camnum] = CAMERA_STATE::STATE_READY;
-				printf("Shot : %d Error : (%d)\n", camnum, ret);
-			}
-			else
-			{
-				std::string  date = Utils::getCurrentDateTime();
-				Utils::Sleep(1);
-				//int ret = cameras[camnum]->downloadimage(name.c_str());
-				camera_state[camnum] = CAMERA_STATE::STATE_UPLOAD;
-			}
-		}
-		break;
-
-		case PACKET_ISO:
-		{
-			//int value = (int&)*(it->data);
-			string value = it->data;
-			cameras[camnum]->set_essential_param(CAMERA_PARAM::ISO, value);
-		}
-		break;
-
-		case PACKET_APERTURE:
-		{
-			//int value = (int&)*(it->data);
-			string value = it->data;
-			cameras[camnum]->set_essential_param(CAMERA_PARAM::APERTURE, value);
-		}
-		break;
-
-		case PACKET_SHUTTERSPEED:
-		{
-			//int value = (int&)*(it->data);
-			string value = it->data;
-			cameras[camnum]->set_essential_param(CAMERA_PARAM::SHUTTERSPEED, value);
-		}
-		break;
-
-		case PACKET_FORCE_UPLOAD:
-			camera_state[camnum] = CAMERA_STATE::STATE_UPLOAD;
-			break;
-		}
-	}
-
-	commander->commandlist.clear();
-#endif
-	return ret;
-}
-
-void camerathread::addTestPacket(char packet, int camnum)
-{
 /*
 	pthread_mutex_lock(&mutex_lock[camnum]);
 
@@ -589,8 +458,7 @@ bool camerathread::StartUpload(int camnum)
 	CURL* curl;
 	CURLcode res;
 	struct WriteThis upload;
-
-	string name = Utils::format_string("name-%d.jpg", camera_serverid[camnum]);
+	string name = Utils::format_string("%s-%d.%s", machine_name.c_str(), camnum, capturefile_ext.c_str());
 
 	Logger::log(camnum, "--------------------------------------------------------");
 	Logger::log(camnum, "Start Upload FTP : %s", name.c_str());
@@ -626,7 +494,7 @@ bool camerathread::StartUpload(int camnum)
 	curl = curl_easy_init();
 	if (curl)
 	{
-		string url = "ftp://" + server_address + "/"+ name;
+		string url = "ftp://" + server_address + "/"+ ftp_path + "/" + name;
 		//string url = "ftp://192.168.29.103/" + name;
 		//curl_easy_setopt(curl, CURLOPT_URL, "ftp://192.168.29.103/2.jpg");
 		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());

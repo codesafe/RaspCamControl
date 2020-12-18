@@ -86,6 +86,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="tcpsocket.cpp" />
     <ClCompile Include="udpsocket.cpp" />
+    <ClCompile Include="udp_thread.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camcontrol.h" />
@@ -95,6 +96,7 @@
     <ClInclude Include="predef.h" />
     <ClInclude Include="tcpsocket.h" />
     <ClInclude Include="udpsocket.h" />
+    <ClInclude Include="udp_thread.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
@@ -110,6 +112,9 @@
     <Link>
       <LibraryDependencies>gphoto2;gphoto2_port;pthread;curl</LibraryDependencies>
     </Link>
+    <RemotePostBuildEvent>
+      <Command>cp config.txt bin/ARM64/Debug</Command>
+    </RemotePostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <Link>

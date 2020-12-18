@@ -11,7 +11,8 @@ public:
 	TCP_Socket();
 	~TCP_Socket();
 
-	void init();
+	bool init();
+	void destroy();
 	bool connect();
 	int update(char* buf);
 	int send(char* buf);

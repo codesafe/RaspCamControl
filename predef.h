@@ -117,8 +117,8 @@ struct WriteThis
 #define CAPTURE_TO_SDCARD		1 // "Memory card"
 
 
-// 카메라 최대 8개
-#define MAX_CAMERA	8
+// 카메라 최대 10개
+#define MAX_CAMERA	10
 
 // 카메라 상태
 enum CAMERA_STATE
@@ -149,7 +149,7 @@ enum CAMERA_STATE
 #define SERVER_UDP_PORT		11000
 #define SOCKET_BUFFER		4096
 #define TCP_BUFFER			16
-#define UDP_BUFFER			8
+#define UDP_BUFFER			32
 
 //////////////////////////////////////////////////////////////////////////	network packet
 
@@ -220,13 +220,15 @@ extern string captureformatString[];
 // read from local config.txt
 extern string server_address;
 extern string machine_name;
+extern string capturefile_ext;			// 캡쳐파일 확장자
+
 
 // recv from server
 extern string ftp_path;
 extern string camera_id;
 
 extern class TCP_Socket tcp_socket;
-extern class UDP_Socket udp_socket;
+//extern class UDP_Socket udp_socket;
 
 
 

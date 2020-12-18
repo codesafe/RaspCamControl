@@ -6,15 +6,9 @@
 #include "camera_manager.h"
 #include "tcpsocket.h"
 #include "udpsocket.h"
+#include "udp_thread.h"
 
-
-/*
-#include "network.h"
-#include "commander.h"
-
-#include "CameraController.h"
-*/
-
+//==============================================================================================================================
 
 // Aperture
 string apertureString[] = { "5", "5.6", "6.3", "7.1", "8", "9", "10", "11", "13", "14",  "16", "18", "20", "22", "25", "29", "32" };
@@ -29,6 +23,9 @@ string shutterspeedString[] = {
 string captureformatString[] = { "Large Fine JPEG", "Large Normal JPEG", "Medium Fine JPEG", "Medium Normal JPEG", "Small Fine JPEG",
 "Small Normal JPEG", "Smaller JPEG", "Tiny JPEG", "RAW + Large Fine JPEG", "RAW" };
 
+//==============================================================================================================================
+
+
 string iso = isoString[ISO_VALUE];
 string aperture = apertureString[APERTURE_VALUE];
 string shutterspeed = shutterspeedString[SHUTTERSPEED_VALUE];
@@ -36,12 +33,16 @@ string captureformat = captureformatString[CAPTURE_FORMAT_VALUE];
 
 string server_address = "";// SERVER_ADD;
 string machine_name = "";
+string capturefile_ext = "jpg";
 string ftp_path = "";
 string camera_id = "";
 
 TCP_Socket tcp_socket;
-UDP_Socket udp_socket;
+//UDP_Socket udp_socket;
 
+//std::vector<camerathread*> threadlist;
+
+camerathread* threadlist[MAX_CAMERA] = { nullptr, };
 
 void LoadConfig()
 {
@@ -73,18 +74,20 @@ void LoadConfig()
 
 bool initcamera()
 {
-	std::vector<camerathread*> threadlist;
+	// 연결된 카메라 검사
 	camera_manager::getInstance()->enumCameraList();
 	int len = camera_manager::getInstance()->getEnumCameraNum();
+
 	for (int i = 0; i < len; i++)
 	{
 		camerathread* thread = new camerathread();
 		thread->init(i);
-		//Utils::Sleep(1.0f);
-		threadlist.push_back(thread);
+		Utils::Sleep(0.5f);
+		//threadlist.push_back(thread);
+		threadlist[i] = thread;
 	}
 
-	// Send camera num & machine name
+	// 카메라 댓수와 머신 이름을 전송 
 	char buf[TCP_BUFFER] = { 0, };
 	buf[0] = (char)len;
 	strcpy(buf+1, machine_name.c_str());
@@ -104,13 +107,24 @@ int main(void)
 		return res;
 	}
 
-	// TODO. Connect to server and receive info
-	tcp_socket.init();
-	if (tcp_socket.connect() == false)
+	while (true)
 	{
-		Logger::log("TCP connect error : %s", server_address.c_str());
-		return -1;
+		// TODO. Connect to server and receive info
+		if (tcp_socket.init() == false)
+			return -1;
+
+		bool connected = tcp_socket.connect();
+
+		if(connected == false)
+		{
+			Utils::Sleep(3.0f);
+			Logger::log("retry connect to : %s", server_address.c_str());
+			tcp_socket.destroy();
+		}
+		else
+			break;
 	}
+
 
 /*
 	int recv = tcp_socket.recv();
@@ -121,56 +135,57 @@ int main(void)
 	}
 
 */
-	// UDP Sock
-	if (udp_socket.init() == false)
-	{
-		Logger::log("UDP Socket init failed.");
-		return -1;
-	}
-
 	// 카메라 초기화
 	initcamera();
 
-	// 	CameraThread* thread = new CameraThread();
-	// 	thread->Start(0);
-	// 	threadlist.push_back(thread);
+// 	// UDP Sock
+// 	if (udp_socket.init() == false)
+// 	{
+// 		Logger::log("UDP Socket init failed.");
+// 		return -1;
+// 	}
+
+	udp_thread* udpthread = new udp_thread();
+	udpthread->init(threadlist);
+
+
 
 	while (true)
 	{
 		Utils::Sleep(10000);
-		/*
-				// for test
-				int i = getch();
-				printf("Input = %d\n", i);
-				if (i == '0')
-				{
-					for (int i = 0; i < threadlist.size(); i++)
-					{
-						threadlist[i]->addTestPacket(PACKET_TRY_CONNECT, i);
-					}
-				}
-				else if (i == '1')
-				{
-					for (int i = 0; i < threadlist.size(); i++)
-					{
-						threadlist[i]->addTestPacket(PACKET_HALFPRESS, i);
-					}
-				}
-				else if (i == '2')
-				{
-					for (int i = 0; i < threadlist.size(); i++)
-					{
-						threadlist[i]->addTestPacket(PACKET_SHOT, i);
-					}
-				}
-				else if (i == '3')
-				{
-					for (int i = 0; i < threadlist.size(); i++)
-					{
-						threadlist[i]->addTestPacket(PACKET_FORCE_UPLOAD, i);
-					}
-				}
-		*/
+/*
+		// for test
+		int i = getch();
+		printf("Input = %d\n", i);
+		if (i == '0')
+		{
+			for (int i = 0; i < threadlist.size(); i++)
+			{
+				threadlist[i]->addTestPacket(PACKET_TRY_CONNECT, i);
+			}
+		}
+		else if (i == '1')
+		{
+			for (int i = 0; i < threadlist.size(); i++)
+			{
+				threadlist[i]->addTestPacket(PACKET_HALFPRESS, i);
+			}
+		}
+		else if (i == '2')
+		{
+			for (int i = 0; i < threadlist.size(); i++)
+			{
+				threadlist[i]->addTestPacket(PACKET_SHOT, i);
+			}
+		}
+		else if (i == '3')
+		{
+			for (int i = 0; i < threadlist.size(); i++)
+			{
+				threadlist[i]->addTestPacket(PACKET_FORCE_UPLOAD, i);
+			}
+		}
+*/
 	}
 
 	curl_global_cleanup();
