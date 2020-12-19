@@ -39,10 +39,13 @@ string camera_id = "";
 
 TCP_Socket tcp_socket;
 //UDP_Socket udp_socket;
-
-//std::vector<camerathread*> threadlist;
-
 camerathread* threadlist[MAX_CAMERA] = { nullptr, };
+
+//pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+//pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+//_threadInfo threadInfo[MAX_CAMERA];
+
 
 void LoadConfig()
 {
@@ -96,9 +99,14 @@ bool initcamera()
 	return true;
 }
 
-int main(void)
+void InitSystem()
 {
 	LoadConfig();
+}
+
+int main(void)
+{
+	InitSystem();
 
 	CURLcode res = curl_global_init(CURL_GLOBAL_DEFAULT);
 	if (res != CURLcode::CURLE_OK)
@@ -125,34 +133,24 @@ int main(void)
 			break;
 	}
 
-
-/*
-	int recv = tcp_socket.recv();
-	if (recv < 1)
-	{
-		Logger::log("TCP recv error : %s", server_address.c_str());
-		return -1;
-	}
-
-*/
 	// 카메라 초기화
 	initcamera();
-
-// 	// UDP Sock
-// 	if (udp_socket.init() == false)
-// 	{
-// 		Logger::log("UDP Socket init failed.");
-// 		return -1;
-// 	}
 
 	udp_thread* udpthread = new udp_thread();
 	udpthread->init(threadlist);
 
-
+	char tcpbuffer[TCP_BUFFER] = { 0, };
 
 	while (true)
 	{
-		Utils::Sleep(10000);
+		for (int i = 0; i < MAX_CAMERA; i++)
+		{
+			if(threadlist[i] == nullptr) continue;
+			if (threadlist[i]->getSendPacket(i, tcpbuffer) == true)
+				tcp_socket.send(tcpbuffer);
+		}
+
+		Utils::Sleep(0.05f);
 /*
 		// for test
 		int i = getch();

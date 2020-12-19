@@ -222,8 +222,7 @@ int camcontrol::capture2(const char* filename)
 {
 	_is_busy = true;
 
-	int ret, fd;
-	CameraFile* file;
+	int ret;
 	CameraFilePath path;
 
 	strcpy(path.folder, "/");
@@ -258,64 +257,70 @@ int camcontrol::capture3(const char* filename)
 
 		switch (event)
 		{
-		case GP_EVENT_FILE_ADDED:
-		{
-			fn = (CameraFilePath*)data;
+			case GP_EVENT_UNKNOWN:
+			case GP_EVENT_TIMEOUT:
+			case GP_EVENT_FOLDER_ADDED:
+			case GP_EVENT_FILE_CHANGED:
+				break;
 
-			CameraFile* file;
-			CameraFileInfo info;
-			ret = gp_camera_file_get_info(_camera, fn->folder, fn->name, &info, _context);
-			if (ret != GP_OK)
+			case GP_EVENT_FILE_ADDED:
 			{
-				printf("gp_camera_file_get_info %s : %d Error\n", filename, ret);
+				fn = (CameraFilePath*)data;
 
-				free(data);
-				_is_busy = false;
-				return ret;
+				CameraFile* file;
+				CameraFileInfo info;
+				ret = gp_camera_file_get_info(_camera, fn->folder, fn->name, &info, _context);
+				if (ret != GP_OK)
+				{
+					Logger::log("gp_camera_file_get_info %s : %d Error\n", filename, ret);
+
+					free(data);
+					_is_busy = false;
+					return ret;
+				}
+				else
+				{
+					Logger::log("gp_camera_file_get_info %s : %s success\n", fn->folder, fn->name);
+				}
+
+				int fd;
+				fd = open(filename, O_CREAT | O_RDWR, 0644);
+				ret = gp_file_new_from_fd(&file, fd);
+				if (ret != GP_OK)
+				{
+					Logger::log("gp_file_new_from_fd %s Error\n", filename);
+					gp_file_unref(file);
+					free(data);
+					_is_busy = false;
+					return ret;
+				}
+
+				ret = gp_camera_file_get(_camera, fn->folder, fn->name, GP_FILE_TYPE_NORMAL, file, _context);
+				if (ret != GP_OK)
+				{
+					Logger::log("gp_camera_file_get %s : %d Error\n", filename, ret);
+					gp_file_unref(file);
+					free(data);
+					_is_busy = false;
+					return ret;
+				}
+				else
+				{
+					printf("gp_camera_file_get %s : %s success\n", fn->folder, fn->name);
+				}
+
+				//gp_file_unref(file);
+				gp_file_free(file);
+				//loop = false;
 			}
-			else
+			break;
+
+			case GP_EVENT_CAPTURE_COMPLETE:
 			{
-				printf("gp_camera_file_get_info %s : %s success\n", fn->folder, fn->name);
+				loop = false;
+				printf("Capture %s Done!\n", filename);
 			}
-
-			int fd;
-			fd = open(filename, O_CREAT | O_RDWR, 0644);
-			ret = gp_file_new_from_fd(&file, fd);
-			if (ret != GP_OK)
-			{
-				printf("gp_file_new_from_fd %s Error\n", filename);
-				gp_file_unref(file);
-				free(data);
-				_is_busy = false;
-				return ret;
-			}
-
-			ret = gp_camera_file_get(_camera, fn->folder, fn->name, GP_FILE_TYPE_NORMAL, file, _context);
-			if (ret != GP_OK)
-			{
-				printf("gp_camera_file_get %s : %d Error\n", filename, ret);
-				gp_file_unref(file);
-				free(data);
-				_is_busy = false;
-				return ret;
-			}
-			else
-			{
-				printf("gp_camera_file_get %s : %s success\n", fn->folder, fn->name);
-			}
-
-			//gp_file_unref(file);
-			gp_file_free(file);
-			//loop = false;
-		}
-		break;
-
-		case GP_EVENT_CAPTURE_COMPLETE:
-		{
-			loop = false;
-			printf("Capture %s Done!\n", filename);
-		}
-		break;
+			break;
 		}
 		free(data);
 	}
@@ -331,7 +336,7 @@ int camcontrol::downloadimage(const char* filename)
 {
 	_is_busy = true;
 
-	int ret, fd;
+	int ret = GP_OK, fd;
 	CameraFile* file;
 	CameraFilePath path;
 
@@ -400,6 +405,7 @@ int camcontrol::downloadimage(const char* filename)
 	gp_file_free(file);
 
 	_is_busy = false;
+	return ret;
 }
 
 

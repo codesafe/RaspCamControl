@@ -230,6 +230,20 @@ extern string camera_id;
 extern class TCP_Socket tcp_socket;
 //extern class UDP_Socket udp_socket;
 
+struct _threadInfo
+{
+	int camNum;
+	pthread_cond_t cond;
+	pthread_mutex_t mutex;
+};
+
+//extern _threadInfo threadInfo[MAX_CAMERA];
+
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 
 
 #endif

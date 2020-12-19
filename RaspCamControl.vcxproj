@@ -115,11 +115,19 @@
     <RemotePostBuildEvent>
       <Command>cp config.txt bin/ARM64/Debug</Command>
     </RemotePostBuildEvent>
+    <ClCompile />
+    <ClCompile>
+      <CAdditionalWarning>%(CAdditionalWarning)</CAdditionalWarning>
+      <CppAdditionalWarning>%(CppAdditionalWarning)</CppAdditionalWarning>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <Link>
       <LibraryDependencies>gphoto2;gphoto2_port;pthread;curl</LibraryDependencies>
     </Link>
+    <RemotePostBuildEvent>
+      <Command>cp config.txt bin/ARM64/Release</Command>
+    </RemotePostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

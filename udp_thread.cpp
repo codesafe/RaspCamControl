@@ -26,7 +26,8 @@ void udp_thread::init(camerathread **threadlist)
 	pthread_mutex_init(&mutex_lock, NULL);
 	pthread_mutex_init(&exitmutex_lock, NULL);
 
-	int err = pthread_create(&threadid, NULL, thread_fn, (void*)threadlist);
+	//int err = 
+	pthread_create(&threadid, NULL, thread_fn, (void*)threadlist);
 
 }
 
@@ -63,6 +64,14 @@ void* udp_thread::thread_fn(void* arg)
 					if (threadlist[i] != nullptr)
 						threadlist[i]->addTestPacket(buf, i);
 				}
+
+				//pthread_cond_broadcast(&threadInfo.cond);
+				for (int i = 0; i < MAX_CAMERA; i++)
+				{
+					if (threadlist[i] != nullptr)
+						threadlist[i]->wakeup(i);//pthread_cond_signal(&threadInfo[i].cond);
+				}
+
 			}
 			break;
 
