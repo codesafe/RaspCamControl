@@ -270,30 +270,17 @@ int camerathread::parsePacket(int camnum)
 		case PACKET_TRY_CONNECT:
 			break;
 
-		case PACKET_HALFPRESS:
+		case PACKET_SET_PARAMETER:
 		{
-
 			char data[TCP_BUFFER] = { 0, };
-			data[0] = PACKET_AUTOFOCUS_RESULT;
+			data[0] = PACKET_SETPARAMETER_RESULT;
 
-/*
-			if (cameras[camnum]->is_halfpressed())
-			{
-				ret = cameras[camnum]->set_settings_value("eosremoterelease", "Release Full");
-				if (ret < GP_OK)
-				{
-					printf("ERR eosremoterelease Release Full : %d : %d\n", ret, camnum);
-					return ret;
-				}
-				printf("End Release 1 : %d : %d\n", ret, camnum);
-			}
-*/
 			unsigned char i = buf[1];	// iso
 			unsigned char s = buf[2];	// shutterspeed
 			unsigned char a = buf[3];	// aperture
 			unsigned char f = buf[4];	// format
 
-			Logger::log(camnum, "PACKET_HALFPRESS %d : %d : %d : %d", i, s, a, f);
+			Logger::log(camnum, "PACKET_SET_PARAMETER %d : %d : %d : %d", i, s, a, f);
 
 			cameras[camnum]->set_essential_param(CAMERA_PARAM::ISO, isoString[i]);
 			cameras[camnum]->set_essential_param(CAMERA_PARAM::SHUTTERSPEED, shutterspeedString[s]);
@@ -312,7 +299,33 @@ int camerathread::parsePacket(int camnum)
 				return ret;
 			}
 
+			data[1] = (char)camnum;
+			data[2] = RESPONSE_OK;
+			addSendPacket(data);
+			Logger::log(camnum, "PACKET_SET_PARAMETER --> RESPONSE_OK");
+		}
+		break;
+
+		case PACKET_HALFPRESS:
+		{
+			char data[TCP_BUFFER] = { 0, };
+			data[0] = PACKET_AUTOFOCUS_RESULT;
+
+/*
+			if (cameras[camnum]->is_halfpressed())
+			{
+				ret = cameras[camnum]->set_settings_value("eosremoterelease", "Release Full");
+				if (ret < GP_OK)
+				{
+					printf("ERR eosremoterelease Release Full : %d : %d\n", ret, camnum);
+					return ret;
+				}
+				printf("End Release 1 : %d : %d\n", ret, camnum);
+			}
+*/
+
 			// false로 하면 auto focus 안먹음
+
 			ret = cameras[camnum]->apply_autofocus(camnum, true);
 			if (ret < GP_OK)
 			{
@@ -324,6 +337,8 @@ int camerathread::parsePacket(int camnum)
 				addSendPacket(data);
 				return ret;
 			}
+
+			Logger::log(camnum, "PACKET_HALFPRESS");
 
 			// 포커스 
 			ret = cameras[camnum]->set_settings_value("eosremoterelease", "Press Half");
@@ -352,7 +367,7 @@ int camerathread::parsePacket(int camnum)
 
 				return ret;
 			}
-/*
+
 			ret = cameras[camnum]->apply_autofocus(camnum, false);
 			if (ret < GP_OK)
 			{
@@ -362,7 +377,7 @@ int camerathread::parsePacket(int camnum)
 				data[1] = (char)camnum;
 				data[2] = RESPONSE_FAIL;
 				return ret;
-			}*/
+			}
 
 			data[1] = (char)camnum;
 			data[2] = RESPONSE_OK;

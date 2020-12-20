@@ -154,8 +154,12 @@ enum CAMERA_STATE
 //////////////////////////////////////////////////////////////////////////	network packet
 
 // response packet
-#define RESPONSE_OK		0x05
-#define RESPONSE_FAIL	0x06
+
+#define RESPONSE_OK				0x07
+#define RESPONSE_FAIL			0x08
+
+#define PACKET_SETPARAMETER_RESULT	0x50
+#define PACKET_AUTOFOCUS_RESULT		0x51
 
 // Log packet
 #define CLIENT_LOG_INFO		0x0a
@@ -169,16 +173,12 @@ enum CAMERA_STATE
 #define PACKET_HALFPRESS		0x20	// auto focus
 #define PACKET_HALFRELEASE		0x21	// auto focus cancel
 
-#define PACKET_ISO				0x31
-#define PACKET_APERTURE			0x32
-#define PACKET_SHUTTERSPEED		0x33
-#define PACKET_CAPTURE_FORMAT	0x34
+#define PACKET_SET_PARAMETER		0x30
 
 #define PACKET_FORCE_UPLOAD		0x40	// for test
 #define PACKET_UPLOAD_PROGRESS	0x41
 #define PACKET_UPLOAD_DONE		0x42
 
-#define PACKET_AUTOFOCUS_RESULT	0x50
 
 
 #define DEFAULT_CAPTURENAME		"capt0000.jpg"

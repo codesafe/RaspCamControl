@@ -56,6 +56,7 @@ void* udp_thread::thread_fn(void* arg)
 
 		switch (packet)
 		{
+			case PACKET_SET_PARAMETER:
 			case PACKET_HALFPRESS:
 			case PACKET_SHOT:
 			{
