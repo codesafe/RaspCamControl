@@ -226,6 +226,8 @@ extern string capturefile_ext;			// 캡쳐파일 확장자
 // recv from server
 extern string ftp_path;
 extern string camera_id;
+extern string ftp_id;
+extern string ftp_passwd;
 
 extern class TCP_Socket tcp_socket;
 //extern class UDP_Socket udp_socket;
@@ -237,7 +239,6 @@ struct _threadInfo
 	pthread_mutex_t mutex;
 };
 
-//extern _threadInfo threadInfo[MAX_CAMERA];
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-variable"

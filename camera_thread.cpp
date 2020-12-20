@@ -265,7 +265,6 @@ int camerathread::parsePacket(int camnum)
 	int ret = 0;
 	std::string  date = Utils::getCurrentDateTime();
 
-#if 1
 	switch (packet)
 	{
 		case PACKET_TRY_CONNECT:
@@ -435,7 +434,7 @@ int camerathread::parsePacket(int camnum)
 			//camera_state[camnum] = CAMERA_STATE::STATE_UPLOAD;
 			break;
 	}
-#endif
+
 	return ret;
 }
 
@@ -505,12 +504,14 @@ bool camerathread::StartUpload(int camnum)
 	if (curl)
 	{
 		string url = "ftp://" + server_address + "/"+ ftp_path + "/" + name;
-		Logger::log(camnum, "FTP full path : %s", url.c_str());
+		string ftpstr = ftp_id +":" + ftp_passwd;
+
+		Logger::log(camnum, "FTP full path : %s (%s)", url.c_str(), ftpstr.c_str());
 
 		//string url = "ftp://192.168.29.103/" + name;
 		//curl_easy_setopt(curl, CURLOPT_URL, "ftp://192.168.29.103/2.jpg");
 		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-		curl_easy_setopt(curl, CURLOPT_USERPWD, "codesafe:6502");
+		curl_easy_setopt(curl, CURLOPT_USERPWD, ftpstr.c_str());// "codesafe:6502");
 		curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
 		curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_callback);
 		curl_easy_setopt(curl, CURLOPT_READDATA, &upload[camnum]);
@@ -527,6 +528,12 @@ bool camerathread::StartUpload(int camnum)
 		curl_easy_cleanup(curl);
 		Logger::log(camnum, "Upload complete\n");
 	}
+
+	// send finish packet
+	char buf[TCP_BUFFER] = { 0, };
+	buf[0] = PACKET_UPLOAD_DONE;
+	buf[1] = camnum;
+	addSendPacket(buf);
 
 	// ³¡
 	delete[] inbuf;
@@ -566,8 +573,11 @@ size_t camerathread::read_callback(void* ptr, size_t size, size_t nmemb, void* u
 			char buf[TCP_BUFFER] = { 0, };
 			if (p == 10)
 			{
-				buf[0] = PACKET_UPLOAD_DONE;
+				//buf[0] = PACKET_UPLOAD_DONE;
+				//buf[1] = (char)upload->camnum;
+				buf[0] = PACKET_UPLOAD_PROGRESS;
 				buf[1] = (char)upload->camnum;
+				buf[2] = (char)upload_progress[upload->camnum];
 			}
 			else
 			{

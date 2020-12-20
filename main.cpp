@@ -35,16 +35,13 @@ string server_address = "";// SERVER_ADD;
 string machine_name = "";
 string capturefile_ext = "jpg";
 string ftp_path = "";
+string ftp_id = "";
+string ftp_passwd = "";
 string camera_id = "";
 
 TCP_Socket tcp_socket;
 //UDP_Socket udp_socket;
 camerathread* threadlist[MAX_CAMERA] = { nullptr, };
-
-//pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-//pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-
-//_threadInfo threadInfo[MAX_CAMERA];
 
 
 void LoadConfig()
@@ -66,8 +63,22 @@ void LoadConfig()
 		fgets(address, sizeof(address), fp);
 		Utils::clearString(address);
 		server_address = string(address);
-
 		Logger::log("server address : %s", server_address.c_str());
+
+		// ftp id
+		char id[32] = { 0, };
+		fgets(id, sizeof(id), fp);
+		Utils::clearString(id);
+		ftp_id = string(id);
+		Logger::log("ftp id : %s", ftp_id.c_str());
+
+		// ftp pass
+		char pass[32] = { 0, };
+		fgets(pass, sizeof(pass), fp);
+		Utils::clearString(pass);
+		ftp_passwd = string(pass);
+		Logger::log("ftp passwd: %s", ftp_passwd.c_str());
+
 		fclose(fp);
 	}
 	else
@@ -150,7 +161,7 @@ int main(void)
 				tcp_socket.send(tcpbuffer);
 		}
 
-		Utils::Sleep(0.05f);
+		Utils::Sleep(0.1f);
 /*
 		// for test
 		int i = getch();
