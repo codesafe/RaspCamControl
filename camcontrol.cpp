@@ -1,4 +1,659 @@
-﻿#include "camcontrol.h"
+﻿#if 1
+
+#include "camcontrol.h"
+#include <functional>
+
+
+camcontrol::camcontrol()
+{
+	cameraWrapper = nullptr;
+}
+
+camcontrol::~camcontrol()
+{
+
+}
+
+void camcontrol::release()
+{
+
+}
+
+camerainfo* camcontrol::getInfo()
+{
+	return &info;
+}
+
+void camcontrol::create(camerainfo& _info)
+{
+	info.port = _info.port;
+	info.modelname = _info.modelname;
+
+	cameraWrapper = new gphoto2pp::CameraWrapper(info.modelname, info.port);
+
+//	auto registration = cameraWrapper->subscribeToCameraEvent(gphoto2pp::CameraEventTypeWrapper::FileAdded, myhandler);
+// 	auto registration = cameraWrapper->subscribeToCameraEvent(gphoto2pp::CameraEventTypeWrapper::CaptureComplete,
+// 		std::bind(&camcontrol::completeHandler, this, std::placeholders::_1, std::placeholders::_2));
+// 
+//  	auto registration2 = cameraWrapper->subscribeToCameraEvent(gphoto2pp::CameraEventTypeWrapper::FileAdded, 
+//  		std::bind(&camcontrol::mySuperSpecialHandler, this, std::placeholders::_1, std::placeholders::_2));
+// 
+// 	cameraWrapper->startListeningForEvents();
+
+	_camera = (Camera*)cameraWrapper->getCamera();
+	_context = (GPContext*)cameraWrapper->getContext();
+
+}
+
+bool camcontrol::is_busy()
+{
+	return true;
+}
+
+// void camcontrol::is_bussy(bool busy)
+// {
+// 
+// }
+
+// int camcontrol::capture(const char* filename)
+// {
+// 	return 0;
+// }
+
+// int camcontrol::capture2(const char* filename)
+// {
+// 	return 0;
+// }
+
+int camcontrol::capture3(const char* filename)
+{
+	_is_busy = true;
+
+	set_settings_value("eosremoterelease", "Immediate");
+
+	void* data = NULL;
+	CameraEventType	event;
+	CameraFilePath* fn;
+	int ret;
+	bool loop = true;
+
+	while (loop)
+	{
+		int leftoverms = 1000;
+		ret = gp_camera_wait_for_event(_camera, leftoverms, &event, &data, _context);
+		if (ret != GP_OK)
+			return ret;
+
+		switch (event)
+		{
+		case GP_EVENT_UNKNOWN:
+		case GP_EVENT_TIMEOUT:
+		case GP_EVENT_FOLDER_ADDED:
+		case GP_EVENT_FILE_CHANGED:
+			break;
+
+		case GP_EVENT_FILE_ADDED:
+		{
+			fn = (CameraFilePath*)data;
+
+			CameraFile* file;
+			CameraFileInfo info;
+			ret = gp_camera_file_get_info(_camera, fn->folder, fn->name, &info, _context);
+			if (ret != GP_OK)
+			{
+				Logger::log("gp_camera_file_get_info %s : %d Error", filename, ret);
+
+				free(data);
+				_is_busy = false;
+				return ret;
+			}
+			else
+			{
+				Logger::log("gp_camera_file_get_info %s : %s success", fn->folder, fn->name);
+			}
+
+			int fd;
+			fd = open(filename, O_CREAT | O_RDWR, 0644);
+			ret = gp_file_new_from_fd(&file, fd);
+			if (ret != GP_OK)
+			{
+				Logger::log("gp_file_new_from_fd %s Error", filename);
+				gp_file_unref(file);
+				free(data);
+				_is_busy = false;
+				return ret;
+			}
+
+			ret = gp_camera_file_get(_camera, fn->folder, fn->name, GP_FILE_TYPE_NORMAL, file, _context);
+			if (ret != GP_OK)
+			{
+				Logger::log("gp_camera_file_get %s : %d Error", filename, ret);
+				gp_file_unref(file);
+				free(data);
+				_is_busy = false;
+				return ret;
+			}
+			else
+			{
+				Logger::log("gp_camera_file_get %s : %s success", fn->folder, fn->name);
+			}
+
+			//gp_file_unref(file);
+			gp_file_free(file);
+			//loop = false;
+		}
+		break;
+
+		case GP_EVENT_CAPTURE_COMPLETE:
+		{
+			loop = false;
+			Logger::log("Capture %s Done!", filename);
+		}
+		break;
+		}
+		free(data);
+	}
+
+	set_settings_value("eosremoterelease", "Release Full");
+	_is_busy = false;
+	_halfpressed = false;
+
+	return true;
+}
+
+void camcontrol::mySuperSpecialHandler(const gphoto2pp::CameraFilePathWrapper& cameraFilePath, const std::string& data)
+{
+	Logger::log(cameraFilePath.Name.c_str());
+	auto cameraFile = cameraWrapper->fileGet(cameraFilePath.Folder, cameraFilePath.Name, gphoto2pp::CameraFileTypeWrapper::Normal);
+	cameraFile.save(savefilename);
+}
+
+void camcontrol::completeHandler(const gphoto2pp::CameraFilePathWrapper& cameraFilePath, const std::string& data)
+{
+	Logger::log(cameraFilePath.Name.c_str());
+	auto cameraFile = cameraWrapper->fileGet(cameraFilePath.Folder, cameraFilePath.Name, gphoto2pp::CameraFileTypeWrapper::Normal);
+	cameraFile.save(savefilename);
+}
+
+
+int camcontrol::downloadimage(const char* filename)
+{
+	return 0;
+}
+
+int camcontrol::get_settings_value(const char* key, string& val)
+{
+	return 0;
+}
+
+// int camcontrol::get_settings_choices(const char* key, std::vector<string>& choices)
+// {
+// 	return 0;
+// }
+
+int camcontrol::set_settings_value(string key, string val)
+{
+
+#if 0
+	int ret = doRadioWidget(key, val);
+	if (ret < GP_OK)
+		Logger::log("Error set_settings_value : %s : %s", key.c_str(), val.c_str());
+	return ret;
+#else
+
+	GPParams gp_params;
+
+	gp_params.camera = _camera;
+	gp_params.context = _context;
+
+	_is_busy = true;
+	int ret = set_config_action(&gp_params, key.c_str(), val.c_str());
+	if (ret < GP_OK)
+	{
+		_is_busy = false;
+	}
+	return ret;
+#endif
+
+
+}
+
+// int camcontrol::set_settings_value(const char* key, int val)
+// {
+// 	return 0;
+// }
+
+
+int camcontrol::apply_cancelautofocus(int camnum, bool enable)
+{
+#if 0
+	int ret = doToggleWidget("cancelautofocus", enable ? "true" : "false");
+	if (ret < GP_OK)
+	{
+		Logger::log(camnum, "Error cancelautofocus : %d", ret);
+	}
+
+	int ret = doToggleWidget("autofocusdrive", enable ? "true" : "false");
+	if (ret < GP_OK)
+	{
+		Logger::log(camnum, "Error autofocusdrive : %d", ret);
+	}
+#else
+	int ret = set_settings_value("cancelautofocus", enable ? "1" : "0");
+	if (ret < GP_OK)
+	{
+		Logger::log(camnum, "Error cancelautofocus : %d", ret);
+		return ret;
+	}
+
+	/*
+		//ret = set_settings_value("autofocusdrive", enable ? "True" : "False");
+		ret = set_settings_value("autofocusdrive", enable ? "1" : "0");
+		if (ret < GP_OK)
+		{
+			Logger::log(camnum, "Error autofocusdrive : %d", ret);
+			return ret;
+		}
+
+	*/
+
+#endif
+	return ret;
+}
+
+int camcontrol::apply_essential_param_param(int camnum)
+{
+
+	int ret = 0;
+	// 	ret = set_settings_value("autofocusdrive", "0");
+	// 	if (ret < GP_OK)
+	// 	{
+	// 		Logger::log(0, "Error autofocusdrive : %d : ret", camnum, ret);
+	// 		return ret;
+	// 	}
+
+	/*
+		ret = set_settings_value("cancelautofocus", "1");
+		if (ret < GP_OK)
+		{
+			Logger::log(0, "Error cancelautofocus : %d : ret", camnum, ret);
+			return ret;
+		}*/
+
+	Logger::log(camnum, "apply iso : %s", iso.c_str());
+//	ret = doRadioWidget("ISO Speed", iso);
+ 	ret = set_settings_value("iso", iso.c_str());					// "400"
+	if (ret < GP_OK)
+	{
+		Logger::log(camnum, "Error set_settings_value iso : %s : %d : %d", iso.c_str(), camnum, ret);
+		return ret;
+	}
+
+	Logger::log(camnum, "apply aperture : %s", aperture.c_str());
+//	ret = doRadioWidget("Aperture", aperture);
+ 	ret = set_settings_value("aperture", aperture.c_str());				// "10"
+	if (ret < GP_OK)
+	{
+		Logger::log(camnum, "Error set_settings_value aperture : %s : %d : %d", aperture.c_str(), camnum, ret);
+		return ret;
+	}
+
+	Logger::log(camnum, "apply shutterspeed : %s", shutterspeed.c_str());
+//	ret = doRadioWidget("Shutter Speed", shutterspeed);
+ 	ret = set_settings_value("shutterspeed", shutterspeed.c_str());		// "1/100"
+	if (ret < GP_OK)
+	{
+		Logger::log(camnum, "Error set_settings_value shutterspeed : %s : %d : %d", shutterspeed.c_str(), camnum, ret);
+		return ret;
+	}
+
+	Logger::log(camnum, "apply imageformat : %s", captureformat.c_str());
+//	ret = doRadioWidget("Image Format", captureformat);
+ 	ret = set_settings_value("imageformat", captureformat.c_str());		// "RAW"
+	if (ret < GP_OK)
+	{
+		Logger::log(camnum, "Error set_settings_value imageformat : %s : %d : %d", captureformat.c_str(), camnum, ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+void camcontrol::set_essential_param(CAMERA_PARAM param, string value)
+{
+	switch (param)
+	{
+	case ISO:
+		iso = value;
+		Logger::log("recv setting iso  %s", iso.c_str());
+		break;
+	case SHUTTERSPEED:
+		shutterspeed = value;
+		Logger::log("recv setting shutterspeed  %s", shutterspeed.c_str());
+		break;
+	case APERTURE:
+		aperture = value;
+		Logger::log("recv setting aperture  %s", aperture.c_str());
+		break;
+
+	case CAPTURE_FORMAT:
+		captureformat = value;
+		if (captureformat == "RAW + Large Fine JPEG" || captureformat == "RAW")
+			capturefile_ext = "raw";
+		else
+			capturefile_ext = "jpg";
+		Logger::log("recv setting captureformat  %s", captureformat.c_str());
+		break;
+	}
+}
+
+int camcontrol::doToggleWidget(std::string key, bool value)
+{
+	auto rootWidget = cameraWrapper->getConfig();
+
+	//auto toggleWidget = rootWidget.getChildByName<gphoto2pp::ToggleWidget>("autofocusdrive");
+	auto toggleWidget = rootWidget.getChildByName<gphoto2pp::ToggleWidget>(key);
+// 	std::cout << "\tReading autofocusdrive Values" << std::endl;
+// 	std::cout << "\t   label:\t" << toggleWidget.getLabel() << std::endl;
+// 	std::cout << "\t   info:\t " << toggleWidget.getInfo() << std::endl;
+// 	std::cout << "\t   type:\t" << static_cast<int>(toggleWidget.getType()) << std::endl;
+// 	std::cout << "\t   value:\t" << toggleWidget.getValue() << std::endl;
+
+	toggleWidget.setValue(value);
+
+	try
+	{
+		cameraWrapper->setConfig(rootWidget);
+	}
+	catch (gphoto2pp::exceptions::gphoto2_exception& e)
+	{
+		Logger::log("couldn't change the toggle");
+		return GP_ERROR;
+	}
+	return GP_OK;
+}
+
+int camcontrol::doRadioWidget(std::string key, std::string value)
+{
+	auto rootWidget = cameraWrapper->getConfig();
+	// 여기에서는 full name을 써야한다.
+	// 확인은 gphpto2 --list-all-config
+	auto radioWidget = rootWidget.getChildByLabel<gphoto2pp::RadioWidget>(key);
+	try
+	{
+		radioWidget.setValue(value);
+		cameraWrapper->setConfig(rootWidget);
+	}
+	catch (gphoto2pp::exceptions::gphoto2_exception& e)
+	{
+		Logger::log("couldn't change the radio");
+		return GP_ERROR;
+	}
+	catch (gphoto2pp::exceptions::ValueOutOfLimits& e)
+	{
+		Logger::log(e.what());
+		return GP_ERROR;
+	}
+	return GP_OK;
+}
+
+int camcontrol::_find_widget_by_name(GPParams* p, const char* name, CameraWidget** child, CameraWidget** rootconfig)
+{
+	int	ret;
+
+	*rootconfig = NULL;
+	ret = gp_camera_get_single_config(p->camera, name, child, p->context);
+	if (ret == GP_OK) {
+		*rootconfig = *child;
+		return GP_OK;
+	}
+
+	ret = gp_camera_get_config(p->camera, rootconfig, p->context);
+	if (ret != GP_OK) return ret;
+	ret = gp_widget_get_child_by_name(*rootconfig, name, child);
+	if (ret != GP_OK)
+		ret = gp_widget_get_child_by_label(*rootconfig, name, child);
+	if (ret != GP_OK)
+	{
+		char* part, * s, * newname;
+
+		newname = strdup(name);
+		if (!newname)
+			return GP_ERROR_NO_MEMORY;
+
+		*child = *rootconfig;
+		part = newname;
+		while (part[0] == '/')
+			part++;
+		while (1)
+		{
+			CameraWidget* tmp;
+
+			s = strchr(part, '/');
+			if (s)
+				*s = '\0';
+			ret = gp_widget_get_child_by_name(*child, part, &tmp);
+			if (ret != GP_OK)
+				ret = gp_widget_get_child_by_label(*child, part, &tmp);
+			if (ret != GP_OK)
+				break;
+			*child = tmp;
+			if (!s)
+			{
+				/* end of path */
+				free(newname);
+				return GP_OK;
+			}
+			part = s + 1;
+			while (part[0] == '/')
+				part++;
+		}
+		gp_context_error(p->context, "%s not found in configuration tree.", newname);
+		free(newname);
+		gp_widget_free(*rootconfig);
+		return GP_ERROR;
+	}
+	return GP_OK;
+}
+
+
+int camcontrol::set_config_action(GPParams* p, const char* name, const char* value)
+{
+	CameraWidget* rootconfig, * child;
+	int	ret, ro;
+	CameraWidgetType	type;
+
+	ret = _find_widget_by_name(p, name, &child, &rootconfig);
+	if (ret != GP_OK)
+		return ret;
+
+	ret = gp_widget_get_readonly(child, &ro);
+	if (ret != GP_OK)
+	{
+		gp_widget_free(rootconfig);
+		return ret;
+	}
+	if (ro == 1)
+	{
+		gp_context_error(p->context, "Property %s is read only.", name);
+		gp_widget_free(rootconfig);
+		return GP_ERROR;
+	}
+	ret = gp_widget_get_type(child, &type);
+	if (ret != GP_OK) {
+		gp_widget_free(rootconfig);
+		return ret;
+	}
+
+	switch (type)
+	{
+	case GP_WIDGET_TEXT:
+	{		/* char *		*/
+		ret = gp_widget_set_value(child, value);
+		if (ret != GP_OK)
+			gp_context_error(p->context, "Failed to set the value of text widget %s to %s.", name, value);
+		break;
+	}
+	case GP_WIDGET_RANGE:
+	{	/* float		*/
+		float	f, t, b, s;
+
+		ret = gp_widget_get_range(child, &b, &t, &s);
+		if (ret != GP_OK)
+			break;
+		if (!sscanf(value, "%f", &f)) {
+			gp_context_error(p->context, "The passed value %s is not a floating point value.", value);
+			ret = GP_ERROR_BAD_PARAMETERS;
+			break;
+		}
+		if ((f < b) || (f > t)) {
+			gp_context_error(p->context, "The passed value %f is not within the expected range %f - %f.", f, b, t);
+			ret = GP_ERROR_BAD_PARAMETERS;
+			break;
+		}
+		ret = gp_widget_set_value(child, &f);
+		if (ret != GP_OK)
+			gp_context_error(p->context, "Failed to set the value of range widget %s to %f.", name, f);
+		break;
+	}
+	case GP_WIDGET_TOGGLE:
+	{	/* int		*/
+		int	t;
+
+		t = 2;
+		if (!strcasecmp(value, "off") || !strcasecmp(value, "no") ||
+			!strcasecmp(value, "false") || !strcmp(value, "0") ||
+			!strcasecmp(value, "off") || !strcasecmp(value, "no") ||
+			!strcasecmp(value, "false")
+			)
+			t = 0;
+		if (!strcasecmp(value, "on") || !strcasecmp(value, "yes") ||
+			!strcasecmp(value, "true") || !strcmp(value, "1") ||
+			!strcasecmp(value, "on") || !strcasecmp(value, "yes") ||
+			!strcasecmp(value, "true")
+			)
+			t = 1;
+		/*fprintf (stderr," value %s, t %d\n", value, t);*/
+		if (t == 2) {
+			gp_context_error(p->context, "The passed value %s is not a valid toggle value.", value);
+			ret = GP_ERROR_BAD_PARAMETERS;
+			break;
+		}
+		ret = gp_widget_set_value(child, &t);
+		if (ret != GP_OK)
+			gp_context_error(p->context, "Failed to set values %s of toggle widget %s.", value, name);
+		break;
+	}
+
+	case GP_WIDGET_DATE:
+	{		/* int			*/
+		time_t	t = -1;
+		struct tm xtm;
+
+		memset(&xtm, 0, sizeof(xtm));
+
+		/* We need to set UNIX time in seconds since Epoch */
+		/* We get ... local time */
+
+		if (!strcasecmp(value, "now") || !strcasecmp(value, "now"))
+			t = time(NULL);
+#ifdef HAVE_STRPTIME
+		else if (strptime(value, "%c", &xtm) || strptime(value, "%Ec", &xtm)) {
+			xtm.tm_isdst = -1;
+			t = mktime(&xtm);
+		}
+#endif
+		if (t == -1)
+		{
+			unsigned long lt;
+
+			if (!sscanf(value, "%ld", &lt))
+			{
+				gp_context_error(p->context, "The passed value %s is neither a valid time nor an integer.", value);
+				ret = GP_ERROR_BAD_PARAMETERS;
+				break;
+			}
+			t = lt;
+		}
+		ret = gp_widget_set_value(child, &t);
+		if (ret != GP_OK)
+			gp_context_error(p->context, "Failed to set new time of date/time widget %s to %s.", name, value);
+		break;
+	}
+	case GP_WIDGET_MENU:
+	case GP_WIDGET_RADIO:
+	{ /* char *		*/
+		int cnt, i;
+		char* endptr;
+
+		cnt = gp_widget_count_choices(child);
+		if (cnt < GP_OK) {
+			ret = cnt;
+			break;
+		}
+		ret = GP_ERROR_BAD_PARAMETERS;
+		for (i = 0; i < cnt; i++) {
+			const char* choice;
+
+			ret = gp_widget_get_choice(child, i, &choice);
+			if (ret != GP_OK)
+				continue;
+			if (!strcmp(choice, value)) {
+				ret = gp_widget_set_value(child, value);
+				break;
+			}
+		}
+		if (i != cnt)
+			break;
+
+		/* make sure we parse just 1 integer, and there is nothing more.
+		 * sscanf just does not provide this, we need strtol.
+		 */
+		i = strtol(value, &endptr, 10);
+		if ((value != endptr) && (*endptr == '\0')) {
+			if ((i >= 0) && (i < cnt)) {
+				const char* choice;
+
+				ret = gp_widget_get_choice(child, i, &choice);
+				if (ret == GP_OK)
+					ret = gp_widget_set_value(child, choice);
+				break;
+			}
+		}
+		/* Lets just try setting the value directly, in case we have flexible setters,
+		 * like PTP shutterspeed. */
+		ret = gp_widget_set_value(child, value);
+		if (ret == GP_OK)
+			break;
+		gp_context_error(p->context, "Choice %s not found within list of choices.", value);
+		break;
+	}
+
+	/* ignore: */
+	case GP_WIDGET_WINDOW:
+	case GP_WIDGET_SECTION:
+	case GP_WIDGET_BUTTON:
+		gp_context_error(p->context, "The %s widget is not configurable.", name);
+		ret = GP_ERROR_BAD_PARAMETERS;
+		break;
+	}
+	if (ret == GP_OK)
+	{
+		if (child == rootconfig)
+			ret = gp_camera_set_single_config(p->camera, name, child, p->context);
+		else
+			ret = gp_camera_set_config(p->camera, rootconfig, p->context);
+		if (ret != GP_OK)
+			gp_context_error(p->context, "Failed to set new configuration value %s for configuration entry %s.", value, name);
+	}
+	gp_widget_free(rootconfig);
+	return (ret);
+}
+
+
+#else
+
+#include "camcontrol.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,9 +666,7 @@
 #include <utime.h>
 #include "utils.h"
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 void camcontrol::release()
 {
@@ -44,24 +697,47 @@ void camcontrol::init()
 {
 	if (!_camera_found)
 	{
-		_init_camera();
+		gp_camera_new(&_camera);
+		_context = gp_context_new();
+
+		gp_context_set_error_func(_context, (GPContextErrorFunc)camcontrol::_error_callback, NULL);
+		gp_context_set_message_func(_context, (GPContextStatusFunc)camcontrol::_message_callback, NULL);
+
+		int ret = gp_camera_init(_camera, _context);
+		if (ret < GP_OK)
+		{
+			gp_camera_free(_camera);
+			return;
+		}
+		else
+			_camera_found = true;
+
+		_is_initialized = true;
 
 		if (_save_images && _camera_found)
 			_set_capturetarget(CAPTURE_TO_RAM);
 	}
 }
 
-string camcontrol::getport()
+// string camcontrol::getport()
+// {
+// 	return port;
+// }
+
+camerainfo* camcontrol::getInfo()
 {
-	return port;
+	return &info;
 }
 
-void camcontrol::setPort(string port)
+void camcontrol::setInfo(camerainfo& _info)
 {
+	info.port = _info.port;
+	info.modelname = _info.modelname;
+
 	GPPortInfoList* portinfo_list;
 	char verified_port[64] = { 0, };
-	strcpy(verified_port, port.c_str());
-	this->port = port;
+	strcpy(verified_port, info.port.c_str());
+	//this->port = port;
 
 
 	GPPortInfo portinfo;
@@ -98,24 +774,6 @@ void camcontrol::setPort(string port)
 	gp_port_info_list_free(portinfo_list);
 }
 
-void camcontrol::_init_camera()
-{
-	gp_camera_new(&_camera);
-	_context = gp_context_new();
-	gp_context_set_error_func(_context, (GPContextErrorFunc)camcontrol::_error_callback, NULL);
-	gp_context_set_message_func(_context, (GPContextMessageFunc)camcontrol::_message_callback, NULL);
-
-	int ret = gp_camera_init(_camera, _context);
-	if (ret < GP_OK)
-	{
-		gp_camera_free(_camera);
-	}
-	else
-	{
-		_camera_found = true;
-	}
-	_is_initialized = true;
-}
 
 camcontrol::~camcontrol()
 {
@@ -207,7 +865,7 @@ int camcontrol::capture(const char* filename)
 			waittime = 10;
 		}
 		else if (type != GP_EVENT_UNKNOWN) {
-			printf("Unexpected event received from camera: %d\n", (int)type);
+			Logger::log("Unexpected event received from camera: %d\n", (int)type);
 		}
 	}
 
@@ -306,7 +964,7 @@ int camcontrol::capture3(const char* filename)
 				}
 				else
 				{
-					printf("gp_camera_file_get %s : %s success\n", fn->folder, fn->name);
+					Logger::log("gp_camera_file_get %s : %s success\n", fn->folder, fn->name);
 				}
 
 				//gp_file_unref(file);
@@ -318,7 +976,7 @@ int camcontrol::capture3(const char* filename)
 			case GP_EVENT_CAPTURE_COMPLETE:
 			{
 				loop = false;
-				printf("Capture %s Done!\n", filename);
+				Logger::log("Capture %s Done!\n", filename);
 			}
 			break;
 		}
@@ -398,7 +1056,7 @@ int camcontrol::downloadimage(const char* filename)
 			waittime = 10;
 		}
 		else if (type != GP_EVENT_UNKNOWN) {
-			printf("Unexpected event received from camera: %d\n", (int)type);
+			Logger::log("Unexpected event received from camera: %d\n", (int)type);
 		}
 	}
 
@@ -637,7 +1295,7 @@ void camcontrol::_set_capturetarget(int index)
 
 	for (int i = 0; i < choices.size(); i++)
 	{
-		printf("Store type : %s\n", choices[i].c_str());
+		Logger::log("Store type : %s\n", choices[i].c_str());
 	}
 
 	if (ret && index < choices.size())
@@ -648,15 +1306,25 @@ void camcontrol::_set_capturetarget(int index)
 
 }
 
-GPContextErrorFunc camcontrol::_error_callback(GPContext* context, const char* text, void* data) {
-
+GPContextErrorFunc camcontrol::_error_callback(GPContext* context, const char* text, void* data)
+{
+	Logger::log("_error_callback : %s", text);
 	return 0;
 }
 
-GPContextMessageFunc camcontrol::_message_callback(GPContext* context, const char* text, void* data) {
+// GPContextMessageFunc camcontrol::_message_callback(GPContext* context, const char* text, void* data) 
+// {
+// 	Logger::log("_message_callback : %s", text);
+// 	return 0;
+// }
 
+GPContextStatusFunc camcontrol::_message_callback(GPContext* context, const char* format, va_list args, void* data)
+{
+	//Logger::log("_message_callback : %s", text);
+	Logger::log("_message_callback : %s", format);
 	return 0;
 }
+
 
 int camcontrol::apply_autofocus(int camnum, bool enable)
 {
@@ -667,6 +1335,7 @@ int camcontrol::apply_autofocus(int camnum, bool enable)
 		return ret;
 	}
 
+/*
 	//ret = set_settings_value("autofocusdrive", enable ? "True" : "False");
 	ret = set_settings_value("autofocusdrive", enable ? "1" : "0");
 	if (ret < GP_OK)
@@ -675,6 +1344,7 @@ int camcontrol::apply_autofocus(int camnum, bool enable)
 		return ret;
 	}
 
+*/
 
 	return ret;
 }
@@ -1017,3 +1687,4 @@ int camcontrol::set_config_action(GPParams* p, const char* name, const char* val
 	return (ret);
 }
 
+#endif

@@ -60,6 +60,10 @@
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <IncludePath>/usr/local/include</IncludePath>
+    <LibraryPath>/usr/local/lib</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <Link>
       <LibraryDependencies>gphoto2;gphoto2_port;pthread;curl</LibraryDependencies>
@@ -82,6 +86,30 @@
     <ClCompile Include="camcontrol.cpp" />
     <ClCompile Include="camera_manager.cpp" />
     <ClCompile Include="camera_thread.cpp" />
+    <ClCompile Include="gphoto2pp\src\camera_abilities_list_wrapper.cpp" />
+    <ClCompile Include="gphoto2pp\src\camera_file_wrapper.cpp" />
+    <ClCompile Include="gphoto2pp\src\camera_list_wrapper.cpp" />
+    <ClCompile Include="gphoto2pp\src\camera_widget_wrapper.cpp" />
+    <ClCompile Include="gphoto2pp\src\camera_wrapper.cpp" />
+    <ClCompile Include="gphoto2pp\src\choices_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\date_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\float_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\gp_port_info_list_wrapper.cpp" />
+    <ClCompile Include="gphoto2pp\src\helper_camera_wrapper.cpp" />
+    <ClCompile Include="gphoto2pp\src\helper_context.cpp" />
+    <ClCompile Include="gphoto2pp\src\helper_debugging.cpp" />
+    <ClCompile Include="gphoto2pp\src\helper_gphoto2.cpp" />
+    <ClCompile Include="gphoto2pp\src\helper_widgets.cpp" />
+    <ClCompile Include="gphoto2pp\src\int_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\menu_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\non_value_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\radio_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\range_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\section_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\string_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\text_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\toggle_widget.cpp" />
+    <ClCompile Include="gphoto2pp\src\window_widget.cpp" />
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="tcpsocket.cpp" />
@@ -92,6 +120,41 @@
     <ClInclude Include="camcontrol.h" />
     <ClInclude Include="camera_manager.h" />
     <ClInclude Include="camera_thread.h" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\button_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\camera_abilities_list_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\camera_capture_type_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\camera_event_type_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\camera_file_path_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\camera_file_type_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\camera_file_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\camera_list_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\camera_widget_type_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\camera_widget_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\camera_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\choices_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\date_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\exceptions.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\float_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\gp_port_info_list_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\helper_camera_wrapper.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\helper_context.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\helper_debugging.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\helper_gphoto2.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\helper_widgets.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\int_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\log.h" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\menu_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\non_value_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\observer.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\radio_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\range_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\range_widget_range.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\section_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\string_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\text_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\toggle_widget.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\value_widget_base.hpp" />
+    <ClInclude Include="gphoto2pp\include\gphoto2pp\window_widget.hpp" />
     <ClInclude Include="logger.h" />
     <ClInclude Include="predef.h" />
     <ClInclude Include="tcpsocket.h" />
@@ -111,6 +174,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <Link>
       <LibraryDependencies>gphoto2;gphoto2_port;pthread;curl</LibraryDependencies>
+      <SharedLibrarySearchPath>%(SharedLibrarySearchPath)</SharedLibrarySearchPath>
     </Link>
     <RemotePostBuildEvent>
       <Command>cp config.txt bin/ARM64/Debug</Command>
@@ -119,6 +183,7 @@
     <ClCompile>
       <CAdditionalWarning>%(CAdditionalWarning)</CAdditionalWarning>
       <CppAdditionalWarning>%(CppAdditionalWarning)</CppAdditionalWarning>
+      <AdditionalIncludeDirectories>gphoto2pp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
@@ -128,6 +193,9 @@
     <RemotePostBuildEvent>
       <Command>cp config.txt bin/ARM64/Release</Command>
     </RemotePostBuildEvent>
+    <ClCompile>
+      <AdditionalIncludeDirectories>gphoto2pp/include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

@@ -35,90 +35,28 @@ Choice: 11 Release 3
 #include "camera_manager.h"
 #include "camcontrol.h"
 #include "utils.h"
-
-
-
-/*
-#define 	GP_ERROR_CORRUPTED_DATA   -102
-Corrupted data received.More...
-#define 	GP_ERROR_FILE_EXISTS   -103
-File already exists.More...
-#define 	GP_ERROR_MODEL_NOT_FOUND   -105
-Specified camera model was not found.More...
-#define 	GP_ERROR_DIRECTORY_NOT_FOUND   -107
-Specified directory was not found.More...
-#define 	GP_ERROR_FILE_NOT_FOUND   -108
-Specified file was not found.More...
-#define 	GP_ERROR_DIRECTORY_EXISTS   -109
-Specified directory already exists.More...
-#define 	GP_ERROR_CAMERA_BUSY   -110
-The camera is already busy.More...
-#define 	GP_ERROR_PATH_NOT_ABSOLUTE   -111
-Path is not absolute.More...
-#define 	GP_ERROR_CANCEL   -112
-Cancellation successful.More...
-#define 	GP_ERROR_CAMERA_ERROR   -113
-Unspecified camera error.More...
-#define 	GP_ERROR_OS_FAILURE   -114
-Unspecified failure of the operating system.More...
-#define 	GP_ERROR_NO_SPACE   -115
-Not enough space.More...
-*/
-
-string GetError(int errorcode)
-{
-	switch (errorcode)
-	{
-	case GP_ERROR_CORRUPTED_DATA:
-		return string("GP_ERROR_CORRUPTED_DATA");
-
-	case GP_ERROR_FILE_EXISTS:
-		return string("GP_ERROR_FILE_EXISTS");
-	case GP_ERROR_MODEL_NOT_FOUND:
-		return string("GP_ERROR_MODEL_NOT_FOUND");
-	case GP_ERROR_DIRECTORY_NOT_FOUND:
-		return string("GP_ERROR_DIRECTORY_NOT_FOUND");
-	case GP_ERROR_FILE_NOT_FOUND:
-		return string("GP_ERROR_FILE_NOT_FOUND");
-	case GP_ERROR_DIRECTORY_EXISTS:
-		return string("GP_ERROR_DIRECTORY_EXISTS");
-	case GP_ERROR_CAMERA_BUSY:
-		return string("GP_ERROR_CAMERA_BUSY");
-	case GP_ERROR_PATH_NOT_ABSOLUTE:
-		return string("GP_ERROR_PATH_NOT_ABSOLUTE");
-	case GP_ERROR_CANCEL:
-		return string("GP_ERROR_CANCEL");
-	case GP_ERROR_CAMERA_ERROR:
-		return string("GP_ERROR_CAMERA_ERROR");
-	case GP_ERROR_OS_FAILURE:
-		return string("GP_ERROR_OS_FAILURE");
-	case GP_ERROR_NO_SPACE:
-		return string("GP_ERROR_NO_SPACE");
-	}
-
-	string errorstr = gp_port_result_as_string(errorcode);
-	return errorstr;
-}
+#include "udpsocket.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-
 camcontrol* camerathread::cameras[MAX_CAMERA];
-CAMERA_STATE camerathread::camera_state[MAX_CAMERA];
 
 bool camerathread::exitthread[MAX_CAMERA];
 pthread_mutex_t camerathread::mutex_lock[MAX_CAMERA];
 pthread_mutex_t camerathread::exitmutex_lock[MAX_CAMERA];
 
-pthread_cond_t camerathread::cond[MAX_CAMERA];
-pthread_mutex_t camerathread::mutex[MAX_CAMERA];
+//pthread_cond_t camerathread::cond[MAX_CAMERA];
+//pthread_mutex_t camerathread::mutex[MAX_CAMERA];
 
 int camerathread::upload_progress[MAX_CAMERA];
 std::deque<char*> camerathread::packetbuffer[MAX_CAMERA];
 char camerathread::recvBuffer[MAX_CAMERA][UDP_BUFFER];
 WriteThis camerathread::upload[MAX_CAMERA];
 
-thread_local unsigned int cameraNum;
+UDP_Socket camerathread::udpsocket[MAX_CAMERA];
+
+
+//thread_local unsigned int cameraNum;
 
 camerathread::camerathread()
 {
@@ -128,139 +66,64 @@ camerathread::~camerathread()
 {
 }
 
-void camerathread::init(int camnumber)
+void camerathread::init(int camnumber, char macninenum)
 {
-	camera_state[camnumber] = CAMERA_STATE::STATE_STARTCONNECT;
-
 	pthread_mutex_init(&mutex_lock[camnumber], NULL);
 	pthread_mutex_init(&exitmutex_lock[camnumber], NULL);
 
+	info.cameranum = camnumber;
+	// 포트 계산 : 11000 + (머신번호*100) + 카메라 번호
+	info.udp_port = SERVER_UDP_PORT + (macninenum * 100) + camnumber;
+
 	//int err = 
-	pthread_create(&threadid, NULL, thread_fn, (void*)camnumber);
+	pthread_create(&threadid, NULL, thread_fn, (void*)&info);
 }
 
 
 void* camerathread::thread_fn(void* arg)
 {
-	cameraNum = (unsigned int)arg;
+	ThreadPassInfo *info = (ThreadPassInfo*)arg;
 
-	camcontrol* camera = camera_manager::getInstance()->getCamera(cameraNum);
-	if (camera == NULL)
+	int cameraNum = info->cameranum;
+	int udp_port = info->udp_port;
+
+	udpsocket[cameraNum].init(udp_port);
+
+	camerainfo* camerainfo = camera_manager::getInstance()->getCameraInfo(cameraNum);
+	cameras[cameraNum] = new camcontrol();
+	if (cameras[cameraNum] == nullptr)
 	{
-		Logger::log(-1, "Thread : Camera Create fail");
+		Logger::log(cameraNum, "Thread %d : Camera Create fail", cameraNum);
 		return((void*)0);
 	}
 	else
 	{
-		Logger::log(-1, "Thread : Camera Create success %d", cameraNum);
+		Logger::log(cameraNum, "Thread %d : Camera Create success", cameraNum);
 	}
- 	cameras[cameraNum] = camera;
+
+	cameras[cameraNum]->create(*camerainfo);
 
 	// main thread loop : Wakeup 시그널이 올때까지 영원히 대기
 	while (true)
 	{
-		Logger::log(cameraNum, "Enter Wait State Camera");
-		pthread_cond_wait(&cond[cameraNum], &mutex[cameraNum]);
-		parsePacket(cameraNum);
+		Logger::log(cameraNum, "Enter Wait State Camera %s", cameras[cameraNum]->getInfo()->modelname.c_str());
+
+		//pthread_cond_wait(&cond[cameraNum], &mutex[cameraNum]);
+		char buf[UDP_BUFFER] = { 0, };
+		int ret = udpsocket[cameraNum].update(buf);
+		if (ret > 0)
+			parsePacket(cameraNum, buf);
+		else
+			Logger::log(cameraNum, "Recv UDP error");
 	}
 
 	pthread_exit((void*)0);
 	return((void*)0);
 }
 
-#if 0
-void camerathread::Update(int camnum)
+int camerathread::parsePacket(int camnum, char* buf)
 {
-	switch (camera_state[camnum])
-	{
-		case CAMERA_STATE::STATE_NONE:
-			break;
-
-		case CAMERA_STATE::STATE_CONNECT_ERROR:
-			Logger::log(camnum, "STATE STATE_CONNECT_ERROR. Retry Connect.");
-			Utils::Sleep(2);
-			camera_state[camnum] = CAMERA_STATE::STATE_STARTCONNECT;
-			return;
-
-		case CAMERA_STATE::STATE_STARTCONNECT:
-			{
-				Logger::log(camnum, "Start Connect to Server.");
-// 				bool connected = tcpsocket[camnum].connect();
-// 				if (connected)
-// 					camera_state[camnum] = CAMERA_STATE::STATE_CONNECTION;
-// 				else
-// 					camera_state[camnum] = CAMERA_STATE::STATE_CONNECT_ERROR;
-
-				camera_state[camnum] = CAMERA_STATE::STATE_READY;
-			}
-			break;
-
-		case CAMERA_STATE::STATE_CONNECTION:
-			{
-// 				char buf[TCP_BUFFER];
-// 				int recvbyte = tcpsocket[camnum].recv(buf);
-// 				if (recvbyte > 0)
-// 				{
-// 					camera_serverid[camnum] = buf[0];
-// 					udpsocket[camnum].init(camera_serverid[camnum]);
-// 					camera_state[camnum] = CAMERA_STATE::STATE_READY;
-// 					Logger::log(camnum, "--------------------------------------------------------");
-// 					Logger::log(camnum, "Connected! Camera Server ID : %d", camera_serverid[camnum]);
-// 					Logger::log(camnum, "--------------------------------------------------------");
-// 
-// 				}
-			}
-			break;
-
-		case CAMERA_STATE::STATE_READY:
-			{
-// 				char buf[UDP_BUFFER];
-// 				int ret = udpsocket[camnum].update(buf);
-// 				if (ret > 0)
-// 					parsePacket(camnum, buf);
-// 				else
-// 					Logger::log(camnum, "Recv UDP error");
-			}
-			break;
-
-		case CAMERA_STATE::STATE_FOCUSING:
-		case CAMERA_STATE::STATE_SHOT:
-			break;
-
-		case CAMERA_STATE::STATE_UPLOAD:
-		{
-			StartUpload(camnum);
-			return;
-		}
-		break;
-
-		case CAMERA_STATE::STATE_UPLOADING:
-		{
-// 			if (upload_progress[camnum] == 10)
-// 			{
-// 				char data[10];
-// 				network[camnum].write(PACKET_UPLOAD_DONE, data, 10);
-// 				camera_state[camnum] = CAMERA_STATE::STATE_READY;
-// 			}
-// 			return;
-		}
-		break;
-	}
-
-	//Logger::log(0,"Camera %d State : %d", camnum, camera_state[camnum]);
-	// network update / parse packet / 패킷있으면 commander에 추가
-	//network[camnum].update();
-	// 쌓여 있는 커맨드가 있으면 여기에서 처리한다.
-	//UpdateCommand(camnum);
-
-
-}
-#endif
-
-
-int camerathread::parsePacket(int camnum)
-{
-	char* buf = recvBuffer[camnum];
+	// char* buf = recvBuffer[camnum];
 	char packet = buf[0];
 	int ret = 0;
 	std::string  date = Utils::getCurrentDateTime();
@@ -295,13 +158,14 @@ int camerathread::parsePacket(int camnum)
 
 				data[1] = (char)camnum;
 				data[2] = RESPONSE_FAIL;
-				addSendPacket(data);
+				addSendPacket(camnum, data);
+				Logger::log(camnum, "PACKET_SET_PARAMETER --> RESPONSE_FAIL");
 				return ret;
 			}
 
 			data[1] = (char)camnum;
 			data[2] = RESPONSE_OK;
-			addSendPacket(data);
+			addSendPacket(camnum, data);
 			Logger::log(camnum, "PACKET_SET_PARAMETER --> RESPONSE_OK");
 		}
 		break;
@@ -318,7 +182,7 @@ int camerathread::parsePacket(int camnum)
 				if (ret < GP_OK)
 				{
 					printf("ERR eosremoterelease Release Full : %d : %d\n", ret, camnum);
-					return ret;
+					return ret; 
 				}
 				printf("End Release 1 : %d : %d\n", ret, camnum);
 			}
@@ -326,7 +190,9 @@ int camerathread::parsePacket(int camnum)
 
 			// false로 하면 auto focus 안먹음
 
-			ret = cameras[camnum]->apply_autofocus(camnum, true);
+
+/*
+			ret = cameras[camnum]->apply_cancelautofocus(camnum, false);
 			if (ret < GP_OK)
 			{
 				string errorstr = GetError(ret);
@@ -334,14 +200,15 @@ int camerathread::parsePacket(int camnum)
 
 				data[1] = (char)camnum;
 				data[2] = RESPONSE_FAIL;
-				addSendPacket(data);
+				addSendPacket(camnum, data);
 				return ret;
 			}
+*/
 
 			Logger::log(camnum, "PACKET_HALFPRESS");
-
 			// 포커스 
-			ret = cameras[camnum]->set_settings_value("eosremoterelease", "Press Half");
+			//ret = cameras[camnum]->set_settings_value("Canon EOS Remote Release", "Press 1");
+			ret = cameras[camnum]->set_settings_value("eosremoterelease", "Press 1");
 			if (ret < GP_OK)
 			{
 				string errorstr = GetError(ret);
@@ -349,13 +216,17 @@ int camerathread::parsePacket(int camnum)
 
 				data[1] = (char)camnum;
 				data[2] = RESPONSE_FAIL;
-				addSendPacket(data);
+				addSendPacket(camnum, data);
+				Logger::log(camnum, "PACKET_HALFPRESS --> RESPONSE_FAIL 1");
 				return ret;
 			}
 			else
-				Logger::log(camnum, "Press Half : %d : %d\n", ret, camnum);
+				Logger::log(camnum, "Press 1 : %d : %d", ret, camnum);
 
-			ret = cameras[camnum]->set_settings_value("eosremoterelease", "Release Full");
+
+			//ret = cameras[camnum]->set_settings_value("Canon EOS Remote Release", "Release 1");
+/*
+			ret = cameras[camnum]->set_settings_value("eosremoterelease", "Release 1");
 			if (ret < GP_OK)
 			{
 				string errorstr = GetError(ret);
@@ -363,12 +234,15 @@ int camerathread::parsePacket(int camnum)
 
 				data[1] = (char)camnum;
 				data[2] = RESPONSE_FAIL;
-				addSendPacket(data);
-
+				addSendPacket(camnum, data);
+				Logger::log(camnum, "PACKET_HALFPRESS --> RESPONSE_FAIL 2");
 				return ret;
 			}
+			else
+				Logger::log(camnum, "Release 1 : %d : %d", ret, camnum);*/
 
-			ret = cameras[camnum]->apply_autofocus(camnum, false);
+/*
+			ret = cameras[camnum]->apply_cancelautofocus(camnum, false);
 			if (ret < GP_OK)
 			{
 				string errorstr = GetError(ret);
@@ -377,17 +251,20 @@ int camerathread::parsePacket(int camnum)
 				data[1] = (char)camnum;
 				data[2] = RESPONSE_FAIL;
 				return ret;
-			}
+			}*/
 
 			data[1] = (char)camnum;
 			data[2] = RESPONSE_OK;
-			addSendPacket(data);
+			addSendPacket(camnum, data);
 			Logger::log(camnum, "PACKET_HALFPRESS --> RESPONSE_OK");
 		}
 		break;
 
 		case PACKET_SHOT:
 		{
+			char data[TCP_BUFFER] = { 0, };
+			data[0] = PACKET_SHOT_RESULT;
+
 			Logger::log("---> Shot : %d : %s", camnum, date.c_str());
 
 			// ftp path 읽어야함
@@ -395,55 +272,42 @@ int camerathread::parsePacket(int camnum)
 
 			// 찍어
 			string name = Utils::format_string("%s-%d.%s", machine_name.c_str(), camnum, capturefile_ext.c_str());
-			
 			int ret = cameras[camnum]->capture3(name.c_str());
-
 			if (ret < GP_OK)
 			{
-				camera_state[camnum] = CAMERA_STATE::STATE_READY;
 				Logger::log(camnum, "Shot Error : (%d)", ret);
+
+				data[1] = (char)camnum;
+				data[2] = RESPONSE_FAIL;
+				return ret;
 			}
 			else
 			{
 				std::string  date = Utils::getCurrentDateTime();
 				Utils::Sleep(1);
 				//int ret = cameras[camnum]->downloadimage(name.c_str());
-				camera_state[camnum] = CAMERA_STATE::STATE_UPLOAD;
+				data[1] = (char)camnum;
+				data[2] = RESPONSE_OK;
+
+
+// 				ret = cameras[camnum]->apply_autofocus(camnum, false);
+// 				if (ret < GP_OK)
+// 				{
+// 					string errorstr = GetError(ret);
+// 					Logger::log(camnum, "ERR apply_autofocus (False) : %s(%d): %d\n", errorstr.c_str(), ret, camnum);
+// 				}
+
+				ret = cameras[camnum]->set_settings_value("eosremoterelease", "Release 1");
+				if (ret < GP_OK)
+				{
+					string errorstr = GetError(ret);
+					Logger::log(camnum, "ERR eosremoterelease Release Full : %s(%d): %d\n", errorstr.c_str(), ret, camnum);
+				}
 
 				StartUpload(camnum);
 			}
 		}
 		break;
-
-/*
-		case PACKET_ISO:
-		{
-			//int value = (int&)*(it->data);
-			//string value = (char*)buf[1];
-			char v = buf[1];
-			iso = isoString[v];
-			cameras[camnum]->set_essential_param(CAMERA_PARAM::ISO, iso);
-		}
-		break;
-
-		case PACKET_APERTURE:
-		{
-			//int value = (int&)*(it->data);
-			char v = buf[1];
-			aperture = apertureString[v];
-			cameras[camnum]->set_essential_param(CAMERA_PARAM::APERTURE, apertureString[v]);
-		}
-		break;
-
-		case PACKET_SHUTTERSPEED:
-		{
-			//int value = (int&)*(it->data);
-			char v = buf[1];
-			shutterspeed = shutterspeedString[v];
-			cameras[camnum]->set_essential_param(CAMERA_PARAM::SHUTTERSPEED, shutterspeed);
-		}
-		break;
-*/
 
 		case PACKET_FORCE_UPLOAD:
 			//camera_state[camnum] = CAMERA_STATE::STATE_UPLOAD;
@@ -476,7 +340,6 @@ void camerathread::addTestPacket(char *packet, int camnum)
 
 bool camerathread::StartUpload(int camnum)
 {
-	camera_state[camnum] = CAMERA_STATE::STATE_UPLOADING;
 	upload_progress[camnum] = 0;
 
 	CURL* curl;
@@ -496,7 +359,6 @@ bool camerathread::StartUpload(int camnum)
 	if (fp == NULL)
 	{
 		Logger::log(camnum, "%s file not found.", name.c_str());
-		camera_state[camnum] = CAMERA_STATE::STATE_READY;
 		return false;
 	}
 
@@ -541,14 +403,14 @@ bool camerathread::StartUpload(int camnum)
 			Logger::log(camnum, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
 		}
 		curl_easy_cleanup(curl);
-		Logger::log(camnum, "Upload complete\n");
 	}
 
 	// send finish packet
 	char buf[TCP_BUFFER] = { 0, };
 	buf[0] = PACKET_UPLOAD_DONE;
 	buf[1] = camnum;
-	addSendPacket(buf);
+	addSendPacket(camnum, buf);
+	Logger::log(camnum, "Upload complete");
 
 	// 끝
 	delete[] inbuf;
@@ -602,7 +464,7 @@ size_t camerathread::read_callback(void* ptr, size_t size, size_t nmemb, void* u
 			}
 
 			// progress send to server
-			addSendPacket(buf);
+			addSendPacket(upload->camnum, buf);
 		}
 		//printf("Progress : %d\n", progress);
 		return copylen;
@@ -611,16 +473,16 @@ size_t camerathread::read_callback(void* ptr, size_t size, size_t nmemb, void* u
 	return 0;                          /* no more data left to deliver */
 }
 
-void camerathread::addSendPacket(char* buf)
+void camerathread::addSendPacket(int camnum, char* buf)
 {
-	Logger::log(cameraNum, "addSendPacket");
+	//Logger::log(cameraNum, "addSendPacket");
 
 	char* buffer = new char[TCP_BUFFER];
 	memcpy(buffer, buf, TCP_BUFFER);
 
-	pthread_mutex_lock(&mutex_lock[cameraNum]);
-	packetbuffer[cameraNum].push_back(buffer);
-	pthread_mutex_unlock(&mutex_lock[cameraNum]);
+	pthread_mutex_lock(&mutex_lock[camnum]);
+	packetbuffer[camnum].push_back(buffer);
+	pthread_mutex_unlock(&mutex_lock[camnum]);
 }
 
 bool camerathread::getSendPacket(int camnumber, char *buf)
@@ -644,6 +506,41 @@ bool camerathread::getSendPacket(int camnumber, char *buf)
 
 void camerathread::wakeup(int camnumber)
 {
-	Logger::log("----> Wake up : %d", camnumber);
-	pthread_cond_signal(&cond[camnumber]);
+//	Logger::log("----> Wake up : %d", camnumber);
+//	pthread_cond_signal(&cond[camnumber]);
+}
+
+string camerathread::GetError(int errorcode)
+{
+	switch (errorcode)
+	{
+	case GP_ERROR_CORRUPTED_DATA:
+		return string("GP_ERROR_CORRUPTED_DATA");
+
+	case GP_ERROR_FILE_EXISTS:
+		return string("GP_ERROR_FILE_EXISTS");
+	case GP_ERROR_MODEL_NOT_FOUND:
+		return string("GP_ERROR_MODEL_NOT_FOUND");
+	case GP_ERROR_DIRECTORY_NOT_FOUND:
+		return string("GP_ERROR_DIRECTORY_NOT_FOUND");
+	case GP_ERROR_FILE_NOT_FOUND:
+		return string("GP_ERROR_FILE_NOT_FOUND");
+	case GP_ERROR_DIRECTORY_EXISTS:
+		return string("GP_ERROR_DIRECTORY_EXISTS");
+	case GP_ERROR_CAMERA_BUSY:
+		return string("GP_ERROR_CAMERA_BUSY");
+	case GP_ERROR_PATH_NOT_ABSOLUTE:
+		return string("GP_ERROR_PATH_NOT_ABSOLUTE");
+	case GP_ERROR_CANCEL:
+		return string("GP_ERROR_CANCEL");
+	case GP_ERROR_CAMERA_ERROR:
+		return string("GP_ERROR_CAMERA_ERROR");
+	case GP_ERROR_OS_FAILURE:
+		return string("GP_ERROR_OS_FAILURE");
+	case GP_ERROR_NO_SPACE:
+		return string("GP_ERROR_NO_SPACE");
+	}
+
+	string errorstr = gp_port_result_as_string(errorcode);
+	return errorstr;
 }

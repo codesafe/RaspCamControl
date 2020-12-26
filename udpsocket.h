@@ -10,7 +10,7 @@ public :
 	UDP_Socket();
 	~UDP_Socket();
 
-	bool init();
+	bool init(int port);
 	int update(char *buf);
 	void send(char *buf, int bufsize);
 

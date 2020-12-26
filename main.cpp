@@ -31,6 +31,7 @@ string aperture = apertureString[APERTURE_VALUE];
 string shutterspeed = shutterspeedString[SHUTTERSPEED_VALUE];
 string captureformat = captureformatString[CAPTURE_FORMAT_VALUE];
 
+bool recieved_serveraddress = false;
 string server_address = "";// SERVER_ADD;
 string machine_name = "";
 string capturefile_ext = "jpg";
@@ -92,27 +93,93 @@ bool initcamera()
 	camera_manager::getInstance()->enumCameraList();
 	int len = camera_manager::getInstance()->getEnumCameraNum();
 
-	for (int i = 0; i < len; i++)
-	{
-		camerathread* thread = new camerathread();
-		thread->init(i);
-		Utils::Sleep(0.5f);
-		//threadlist.push_back(thread);
-		threadlist[i] = thread;
-	}
-
 	// 카메라 댓수와 머신 이름을 전송 
 	char buf[TCP_BUFFER] = { 0, };
 	buf[0] = (char)len;
 	strcpy(buf+1, machine_name.c_str());
 	tcp_socket.send(buf);
 
+	// 할당된 카메라 번호 수신 --> UDP Port 결정
+	char recvbuf[TCP_BUFFER] = { 0, };
+	int nrecv = tcp_socket.recv(recvbuf);
+	char macninenum = recvbuf[0];
+
+	for (int i = 0; i < len; i++)
+	{
+		camerathread* thread = new camerathread();
+		thread->init(i, macninenum);
+		Utils::Sleep(0.5f);
+		//threadlist.push_back(thread);
+		threadlist[i] = thread;
+	}
+
+
 	return true;
 }
+
+void RecieveServerInfo()
+{
+	int sock;
+	struct sockaddr_in broadcastAddr;
+	unsigned short broadcastPort;
+	char recvString[UDP_BUFFER] = { 0, };
+	int recvStringLen;
+
+	broadcastPort = SERVER_UDP_BROADCASTPORT;
+
+	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+	{
+		Logger::log("socket() failed");
+		return;
+	}
+
+ 	memset(&broadcastAddr, 0, sizeof(broadcastAddr));
+	broadcastAddr.sin_family = AF_INET;
+	broadcastAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	broadcastAddr.sin_port = htons(broadcastPort);
+
+
+	static int reuseFlag = 1;
+	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuseFlag, sizeof reuseFlag) != 0)
+	{
+		Logger::log("[%s] RecieveServerInfo setsockopt(SO_REUSEADDR) error: ", __FUNCTION__);
+		close(sock);
+		return;
+	}
+
+	if (bind(sock, (struct sockaddr*)&broadcastAddr, sizeof(broadcastAddr)) < 0)
+	{
+		Logger::log("RecieveServerInfo bind() failed");
+		return;
+	}
+
+	if ((recvStringLen = recvfrom(sock, recvString, UDP_BUFFER, 0, NULL, 0)) < 0)
+	{
+		Logger::log("RecieveServerInfo recvfrom() failed");
+		return;
+	}
+	//recvString[recvStringLen] = '\0';
+
+	char vbuff[UDP_BUFFER] = { 0, };
+	sprintf(vbuff, "%d.%d.%d.%d", (unsigned char)recvString[1], (unsigned char)recvString[2],
+		(unsigned char)recvString[3], (unsigned char)recvString[4]);
+
+	//Logger::log("Received: %d : %s\n", recvString[0], vbuff);
+
+	if (recvString[0] == UDP_BROADCAST_PACKET)
+	{
+ 		server_address = string(vbuff);
+ 		Logger::log("Recv server address : %s", server_address.c_str());
+	}
+
+	close(sock);
+}
+
 
 void InitSystem()
 {
 	LoadConfig();
+	RecieveServerInfo();
 }
 
 int main(void)
@@ -147,8 +214,9 @@ int main(void)
 	// 카메라 초기화
 	initcamera();
 
-	udp_thread* udpthread = new udp_thread();
-	udpthread->init(threadlist);
+// 안쓰는거로
+// 	udp_thread* udpthread = new udp_thread();
+// 	udpthread->init(threadlist);
 
 	char tcpbuffer[TCP_BUFFER] = { 0, };
 

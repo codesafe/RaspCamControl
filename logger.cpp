@@ -9,7 +9,7 @@ void Logger::log(const char* format, ...)
 {
 	bool consolelog_enable = true;
 	//bool filelog_enable = (FILE_LOG & logtype) == 0 ? false : true;		// define으로 제어
-	bool filelog_enable = false;//MemDB::getInstance()->getBoolValue("filelog");
+	bool filelog_enable = true;//MemDB::getInstance()->getBoolValue("filelog");
 
 	char buf[2048] = { 0, };
 	va_list ap;
@@ -36,7 +36,7 @@ void Logger::log(int camnum, const char* format, ...)
 {
 	bool consolelog_enable = true;
 	//bool filelog_enable = (FILE_LOG & logtype) == 0 ? false : true;		// define으로 제어
-	bool filelog_enable = false;//MemDB::getInstance()->getBoolValue("filelog");
+	bool filelog_enable = true;//MemDB::getInstance()->getBoolValue("filelog");
 
 	char buf[2048] = { 0, };
 	va_list ap;

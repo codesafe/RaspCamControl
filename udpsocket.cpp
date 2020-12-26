@@ -12,7 +12,7 @@ UDP_Socket::~UDP_Socket()
 		close(sock);
 }
 
-bool UDP_Socket::init()
+bool UDP_Socket::init(int port)
 {
 	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 	{
@@ -24,13 +24,21 @@ bool UDP_Socket::init()
 
 	servAddr.sin_family = AF_INET;
 	servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	servAddr.sin_port = htons(SERVER_UDP_PORT);
+	servAddr.sin_port = htons(port);
 
-	Logger::log("Init UDP Port : %d", SERVER_UDP_PORT);
+	static int reuseFlag = 1;
+	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuseFlag, sizeof reuseFlag) != 0)
+	{
+		Logger::log("[%s] UDP setsockopt(SO_REUSEADDR) error: ", __FUNCTION__);
+		close(sock);
+		return false;
+	}
+
+	Logger::log("Init UDP Port : %d", port);
 
 	if (bind(sock, (struct sockaddr*)&servAddr, sizeof(servAddr)) == -1) 
 	{
-		Logger::log("Bind failed.");
+		Logger::log("UDP_Socket Bind failed. %s", strerror(errno));
 		return false;
 	}
 
@@ -49,7 +57,7 @@ void UDP_Socket::send(char* buf, int bufsize)
 
 	if (sentsize != bufsize)
 	{
-		Logger::log("Sendto failed.");
+		Logger::log("UDP_Socket Sendto failed.");
 		return;
 	}
 }

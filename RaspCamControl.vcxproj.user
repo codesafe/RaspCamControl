@@ -3,4 +3,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <RemoteTarget>23195366;192.168.29.133 (username=, port=22, authentication=Password)</RemoteTarget>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <RemoteTarget>-1520404629;192.168.29.206 (username=, port=22, authentication=Password)</RemoteTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <RemoteTarget>-1520404629;192.168.29.206 (username=, port=22, authentication=Password)</RemoteTarget>
+  </PropertyGroup>
 </Project>

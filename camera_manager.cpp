@@ -1,6 +1,47 @@
 #include "camera_manager.h"
 #include "camcontrol.h"
 
+#if 1
+
+camera_manager* camera_manager::_instance = nullptr;
+
+camera_manager::camera_manager()
+{
+
+}
+
+camera_manager::~camera_manager()
+{
+
+}
+
+void camera_manager::enumCameraList()
+{
+	auto cameraList = gphoto2pp::autoDetectAll();
+	for (int i = 0; i < cameraList.count(); ++i)
+	{
+		camerainfo _camerainfo;
+		_camerainfo.modelname = cameraList.getName(i);
+		_camerainfo.port = cameraList.getValue(i);
+		Logger::log("Detect Camera %d : %s : %s",i , _camerainfo.modelname.c_str(), _camerainfo.port.c_str());
+		cameraIDlist.push_back(_camerainfo);
+	}
+}
+
+int camera_manager::getEnumCameraNum()
+{
+	return (int)cameraIDlist.size();
+}
+
+camerainfo* camera_manager::getCameraInfo(int i)
+{
+	return &cameraIDlist[i];
+}
+
+
+
+#else
+
 camera_manager* camera_manager::_instance = NULL;
 
 camera_manager::camera_manager()
@@ -34,7 +75,11 @@ void camera_manager::enumCameraList()
 
 		int ret = gp_camera_init(camera, context);
 		if (ret < GP_OK)
+		{
+			Logger::log("gp_camera_init Error!");
 			gp_camera_free(camera);
+			return;
+		}
 
 		//////////////////////////////////////////////////////////////////////////
 
@@ -65,35 +110,41 @@ void camera_manager::enumCameraList()
 				break;
 			gp_port_info_get_name(info, &xname);
 			gp_port_info_get_path(info, &xpath);
-			printf("%-32s %-32s\n", xpath, xname);
+			Logger::log("%-32s %-32s\n", xpath, xname);
 		}
 
 		//////////////////////////////////////////////////////////////////////////
 
+		const char* name = NULL, * value = NULL;
+		CameraList* list;
+		gp_list_new(&list);
+		gp_abilities_list_detect(gp_params_abilities_list(context, _abilities_list), portinfo_list, list, context);
+
+		count = gp_list_count(list);
+
+		Logger::log("%-30s %-16s\n", "Model", "Port");
+		Logger::log("----------------------------------------------------------\n");
+
+		for (int x = 0; x < count; x++)
 		{
-			const char* name = NULL, * value = NULL;
-			CameraList* list;
-			gp_list_new(&list);
-			gp_abilities_list_detect(gp_params_abilities_list(context, _abilities_list), portinfo_list, list, context);
+			gp_list_get_name(list, x, &name);
+			gp_list_get_value(list, x, &value);
+			Logger::log("%-30s %-16s\n", name, value);
 
-			int count = gp_list_count(list);
-
-			printf("%-30s %-16s\n", "Model", "Port");
-			printf("----------------------------------------------------------\n");
-			for (int x = 0; x < count; x++)
-			{
-				gp_list_get_name(list, x, &name);
-				gp_list_get_value(list, x, &value);
-				printf("%-30s %-16s\n", name, value);
-
-				cameraIDlist.push_back(std::string(value));
-			}
-			gp_list_free(list);
-
+			camerainfo info;
+			info.port = std::string(value);
+			info.modelname = std::string(name);
+			cameraIDlist.push_back(info);
 		}
+		gp_list_free(list);
+		Logger::log("----------------------------------------------------------\n");
 
 		if(camera != NULL)
 			gp_camera_exit(camera, context);
+
+ 		if (camera != NULL)
+ 			gp_camera_free(camera);
+
 		if( context != NULL )
 			gp_context_unref(context);
 
@@ -111,8 +162,7 @@ void camera_manager::enumCameraList()
 		for (int i=0; i< cameraIDlist.size(); i++)
 		{
 			camcontrol* camera = new camcontrol();
-			camera->init();
-			camera->setPort(cameraIDlist[i]);
+			camera->create(cameraIDlist[i]);
 			cameraList.push_back(camera);
 		}
 	}
@@ -145,3 +195,5 @@ camcontrol* camera_manager::getCamera(int i)
 
 	return cameraList[i];
 }
+
+#endif

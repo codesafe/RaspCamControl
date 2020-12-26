@@ -38,7 +38,7 @@ void* udp_thread::thread_fn(void* arg)
 	// UDP Sock
 	UDP_Socket udp_socket;
 
-	if (udp_socket.init() == false)
+	if (udp_socket.init(SERVER_UDP_PORT) == false)
 	{
 		Logger::log("UDP Socket init failed.");
 		return((void*)-1);

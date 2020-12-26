@@ -44,6 +44,7 @@ bool TCP_Socket::init()
 		return false;
 	}
 
+/*
 	int curFlags = fcntl(sock, F_GETFL, 0);
 	if (fcntl(sock, F_SETFL, curFlags | O_NONBLOCK) < 0)
 	{
@@ -51,6 +52,7 @@ bool TCP_Socket::init()
 		close(sock);
 		return false;
 	}
+*/
 
 	return true;
 }
