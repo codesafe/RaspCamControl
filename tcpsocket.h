@@ -17,7 +17,6 @@ public:
 	int update(char* buf);
 	int send(char* buf);
 	int recv(char* buf);
-	int recv();
 
 private:
 
@@ -25,5 +24,4 @@ private:
 	struct sockaddr_in server;
 	struct sockaddr_in clntAddr;
 
-	char recvbuf[TCP_BUFFER];
 };

@@ -38,6 +38,10 @@ camerainfo* camera_manager::getCameraInfo(int i)
 	return &cameraIDlist[i];
 }
 
+string camera_manager::getCameraName(int i)
+{
+	return cameraIDlist[i].modelname;
+}
 
 
 #else

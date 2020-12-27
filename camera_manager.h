@@ -18,6 +18,7 @@ public:
 	void enumCameraList();
 	int getEnumCameraNum();		// °¹¼ö
 	camerainfo* getCameraInfo(int i);
+	string getCameraName(int i);
 
 private:
 	camera_manager();

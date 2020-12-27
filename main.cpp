@@ -4,6 +4,7 @@
 #include "utils.h"
 #include "camera_thread.h"
 #include "camera_manager.h"
+#include "camcontrol.h"
 #include "tcpsocket.h"
 #include "udpsocket.h"
 #include "udp_thread.h"
@@ -95,9 +96,21 @@ bool initcamera()
 
 	// 카메라 댓수와 머신 이름을 전송 
 	char buf[TCP_BUFFER] = { 0, };
-	buf[0] = (char)len;
-	strcpy(buf+1, machine_name.c_str());
+	buf[0] = PACKET_MACHINE_INFO;
+	buf[1] = (char)len;
+	strcpy(buf+2, machine_name.c_str());
 	tcp_socket.send(buf);
+
+	// 카메라 이름 전송
+	for (int i= 0; i < len; i++)
+	{
+		string name = camera_manager::getInstance()->getCameraName(i);
+		char buf[TCP_BUFFER] = { 0, };
+		buf[0] = PACKET_CAMERA_NAME;
+		buf[1] = i;
+		strcpy(buf+2, name.c_str());
+		tcp_socket.send(buf);
+	}
 
 	// 할당된 카메라 번호 수신 --> UDP Port 결정
 	char recvbuf[TCP_BUFFER] = { 0, };

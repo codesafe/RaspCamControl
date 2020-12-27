@@ -178,7 +178,7 @@ enum CAMERA_STATE
 #define SERVER_UDP_PORT					11000
 #define SERVER_UDP_BROADCASTPORT		9999
 #define SOCKET_BUFFER		4096
-#define TCP_BUFFER			16
+#define TCP_BUFFER			32
 #define UDP_BUFFER			32
 
 //////////////////////////////////////////////////////////////////////////	network packet
@@ -188,10 +188,6 @@ enum CAMERA_STATE
 #define RESPONSE_OK				0x07
 #define RESPONSE_FAIL			0x08
 
-#define PACKET_SETPARAMETER_RESULT	0x50
-#define PACKET_AUTOFOCUS_RESULT		0x51
-#define PACKET_SHOT_RESULT			0x52
-
 // Log packet
 #define CLIENT_LOG_INFO		0x0a
 #define CLIENT_LOG_WARN		0x0b
@@ -199,7 +195,9 @@ enum CAMERA_STATE
 
 
 // Packet
-#define	PACKET_TRY_CONNECT		0x05	// connect to server
+
+#define	PACKET_MACHINE_INFO		0x08	// 머신 정보
+#define PACKET_CAMERA_NAME		0x09
 #define	PACKET_SHOT				0x10	// shot picture
 #define PACKET_HALFPRESS		0x20	// auto focus
 #define PACKET_HALFRELEASE		0x21	// auto focus cancel
@@ -209,6 +207,11 @@ enum CAMERA_STATE
 #define PACKET_FORCE_UPLOAD		0x40	// for test
 #define PACKET_UPLOAD_PROGRESS	0x41
 #define PACKET_UPLOAD_DONE		0x42
+
+#define PACKET_SETPARAMETER_RESULT	0x50
+#define PACKET_AUTOFOCUS_RESULT		0x51
+#define PACKET_SHOT_RESULT			0x52
+
 
 #define UDP_BROADCAST_PACKET	0xa0
 

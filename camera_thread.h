@@ -49,11 +49,9 @@ private:
 	static std::deque<char*> packetbuffer[MAX_CAMERA];
 	static char recvBuffer[MAX_CAMERA][UDP_BUFFER];
 
-	//static pthread_cond_t cond[MAX_CAMERA];
-	//static pthread_mutex_t mutex[MAX_CAMERA];
-
 	static WriteThis upload[MAX_CAMERA];
 	static UDP_Socket udpsocket[MAX_CAMERA];
+	static float delaytime[MAX_CAMERA];
 };
 
 

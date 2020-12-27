@@ -121,17 +121,37 @@ int TCP_Socket::update(char* buf)
 
 int TCP_Socket::send(char* buf)
 {
-	return ::send(sock, buf, TCP_BUFFER, 0);
+	int totalsend = 0;
+	while (true)
+	{
+		int n = ::send(sock, buf + totalsend, TCP_BUFFER - totalsend, 0);
+		totalsend += n;
+		if (totalsend >= TCP_BUFFER)
+		{
+			//printf("TCP Send : %d\n", totalsend);
+			break;
+		}
+	}
+
+	return totalsend;
+//	return ::send(sock, buf, TCP_BUFFER, 0);
 }
 
 int TCP_Socket::recv(char* buf)
 {
-	return ::recv(sock, buf, TCP_BUFFER, 0);
-}
+	int totalrecv = 0;
+	while (true)
+	{
+		int n = ::recv(sock, buf+totalrecv, TCP_BUFFER - totalrecv, 0);
+		totalrecv += n;
+		if (totalrecv >= TCP_BUFFER)
+		{
+			printf("TCP Recv : %d\n", totalrecv);
+			break;
+		}
+	}
 
-int TCP_Socket::recv()
-{
-	return ::recv(sock, recvbuf, TCP_BUFFER, 0);
+	return totalrecv;
+	//return ::recv(sock, buf, TCP_BUFFER, 0);
 }
-
 
